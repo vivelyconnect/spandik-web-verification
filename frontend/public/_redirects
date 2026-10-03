@@ -1,0 +1,15 @@
+# SP-15-09 originally listed every client-side route here as a
+# `/path /index.html 200` "rewrite" rule. Cloudflare's own current docs
+# (developers.cloudflare.com/pages/configuration/redirects/) are explicit
+# that _redirects rewrites with a non-3xx status are NOT a supported
+# feature — this worked when SP-15-09 verified it live, then stopped:
+# every route below started returning a real 308 redirect to `/` instead
+# of the SPA shell, confirmed via the deployment's own build log
+# ("Found invalid redirect lines... Infinite loop detected") and via curl
+# against the live deployment. Fixed at the incident dated 2026-08-03 with
+# Cloudflare's actual documented mechanism instead: a Pages Function at
+# /functions/[[path]].js, which serves index.html for any request that
+# doesn't match a real static asset. _redirects rules are evaluated before
+# Functions run, so the broken 200-status lines had to be removed here,
+# not just superseded — leaving them would still 308 every route before
+# the Function ever got a chance to run.

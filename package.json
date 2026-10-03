@@ -1,0 +1,7 @@
+{
+  "name": "spandik-web-verification",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ]
+}

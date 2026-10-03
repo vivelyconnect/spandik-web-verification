@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#FF9F1C" />
+  <meta name="description" content="Spandik — India's own social media, a product of Vively Technology Solutions Private Limited. Connect, share and chat in English, Hindi and Bengali." />
+  <title>Spandik</title>
+  <link rel="manifest" href="/manifest.json" />
+  <!-- SP-5-10: the heritage horizon is the Largest Contentful Paint element on
+       most screens, but ThemeBackdrop only renders after the JS bundle runs —
+       preload the exact variant <picture> will choose so it downloads in
+       parallel with the JS instead of after it. -->
+  <link rel="preload" as="image" href="/brand/heritage-sunset-horizon-mobile.webp" media="(max-width: 767px)" fetchpriority="high" />
+  <link rel="preload" as="image" href="/brand/heritage-sunset-horizon.webp" media="(min-width: 768px)" fetchpriority="high" />
+  <!-- SP-5-09: iOS home-screen mode (iOS has no install prompt event; this
+       keeps an added-to-home-screen Spandik full-screen and correctly titled). -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Spandik" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <!-- SP-5-00: previously missing entirely — manifest.json's own icons also
+       pointed at a /icons/ directory that doesn't exist in this repo at all
+       (a real, pre-existing broken-PWA-install bug), now fixed to the real
+       approved brand assets. -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/brand/spandik-app-icon-32.png" />
+  <link rel="icon" type="image/png" sizes="48x48" href="/brand/spandik-app-icon-48.png" />
+  <link rel="icon" type="image/png" sizes="96x96" href="/brand/spandik-app-icon-96.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/brand/spandik-app-icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- SP-5-00: Plus Jakarta Sans is the app's primary UI typeface; Noto Sans
+       Bengali/Devanagari cover those scripts. Fraunces stays for the wordmark-
+       adjacent serif headings already used across auth/legal pages. -->
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;0,9..144,900;1,9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    #root { min-height: 100vh; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* ── DESKTOP: top navbar, no bottom nav ── */
+    .desktop-header { display: flex !important; }
+    .mobile-bottom-nav { display: none !important; }
+    .main-content { padding-bottom: 0 !important; }
+    .desktop-footer { display: block !important; }
+
+    /* ── MOBILE: hide top navbar, show bottom nav ── */
+    .mobile-header { display: none !important; }
+    @media (max-width: 768px) {
+      .desktop-header { display: none !important; }
+      .mobile-bottom-nav { display: flex !important; }
+      .mobile-header { display: flex !important; }
+      .main-content { padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important; }
+      .desktop-footer { display: none !important; }
+    }
+
+    /* ── Glass card utility ── */
+    .glass-card {
+      background: rgba(255,255,255,0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

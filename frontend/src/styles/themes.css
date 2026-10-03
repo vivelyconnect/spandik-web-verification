@@ -1,0 +1,464 @@
+/* src/styles/themes.css — Spandik theme system */
+/* Theme is set by class on <html>: heritage-sunset (default, SP-5-00) | saffron | aurora | ink | heritage-sunset-dark */
+
+/* ── HERITAGE SUNSET (default, SP-5-00) ──────────────────────────
+   Token values per docs/THEME_HERITAGE_SUNSET_SPEC.md. Mapped onto the
+   same generic variable names saffron/aurora/ink already use below, so
+   every existing component re-skins with zero other file changes. */
+html.theme-heritage-sunset {
+  --brand:        #FF9F1C;
+  --brand-dark:   #E8850A;
+  --brand-light:  rgba(255,159,28,0.12);
+  --link:         #AA6200; /* SP-5-01: AA-safe darkened --brand for small text (links, active labels) — vivid --brand stays for backgrounds/borders/large text */
+  --accent:       #7C3AED;
+  --accent-light: rgba(124,58,237,0.10);
+  --teal:         #0EA5A0;
+  --coral:        #FF647C;
+  --amber:        #FFAE45;
+  --green:        #22C55E;
+
+  --bg:           #FEF9F3;
+  --bg2:          #FFF5EB;
+  --white:        #FFFDFC;
+  --surface:      rgba(255,255,255,0.84);
+  --surface-blur: rgba(254,249,243,0.88);
+  --glass:        rgba(255,255,255,0.78);
+  --glass-border: rgba(232,212,197,0.72);
+
+  --text:         #241B43;
+  --text2:        #453A63;
+  --text3:        #746A7D;
+  --text4:        #7D6D8C; /* SP-5-01: darkened from #9C8FA8 (was 3.0:1 on white, fails WCAG AA text) to 4.5:1+ */
+  --text5:        #CBC0D4;
+
+  --border:       #F1E3D7;
+  --border2:      rgba(36,27,67,0.14);
+  --divider:      rgba(36,27,67,0.06);
+
+  --shadow-sm: 0 1px 3px rgba(36,27,67,0.06), 0 1px 2px rgba(36,27,67,0.04);
+  --shadow:    0 10px 32px rgba(36,27,67,0.07), 0 2px 8px rgba(36,27,67,0.04);
+  --shadow-lg: 0 20px 48px rgba(36,27,67,0.12), 0 4px 12px rgba(36,27,67,0.06);
+  --shadow-brand: 0 6px 24px rgba(255,159,28,0.32);
+
+  --nav-bg:       rgba(255,252,248,0.68);
+  --sidebar-bg:   #241B43;
+  --sidebar-text: rgba(255,255,255,0.72);
+  --sidebar-active: rgba(255,159,28,0.2);
+  --sidebar-indicator: #FF9F1C;
+
+  --btn-primary-bg:   linear-gradient(135deg,#241B43,#3A2A63);
+  --btn-primary-text: #FFAE45;
+  --btn-brand-bg:     linear-gradient(135deg,#FF9F1C 0%,#F43F75 52%,#7C3AED 100%);
+  --btn-brand-text:   #fff;
+
+  --input-bg:     rgba(255,253,252,0.85);
+  --input-border: rgba(255,159,28,0.22);
+  --input-focus:  #FF9F1C;
+
+  --r: 16px;
+  --r-sm: 10px;
+  --r-xs: 7px;
+  --r-full: 9999px;
+}
+:root { /* falls back to heritage-sunset's values until main.tsx's pre-render script applies the resolved theme class */
+  --brand: #FF9F1C; --brand-dark: #E8850A; --brand-light: rgba(255,159,28,0.12); --link: #AA6200;
+  --accent: #7C3AED; --accent-light: rgba(124,58,237,0.10);
+  --teal: #0EA5A0; --coral: #FF647C; --amber: #FFAE45; --green: #22C55E;
+  --bg: #FEF9F3; --bg2: #FFF5EB; --white: #FFFDFC;
+  --surface: rgba(255,255,255,0.84); --surface-blur: rgba(254,249,243,0.88);
+  --glass: rgba(255,255,255,0.78); --glass-border: rgba(232,212,197,0.72);
+  --text: #241B43; --text2: #453A63; --text3: #746A7D; --text4: #7D6D8C; --text5: #CBC0D4;
+  --border: #F1E3D7; --border2: rgba(36,27,67,0.14); --divider: rgba(36,27,67,0.06);
+  --shadow-sm: 0 1px 3px rgba(36,27,67,0.06), 0 1px 2px rgba(36,27,67,0.04);
+  --shadow: 0 10px 32px rgba(36,27,67,0.07), 0 2px 8px rgba(36,27,67,0.04);
+  --shadow-lg: 0 20px 48px rgba(36,27,67,0.12), 0 4px 12px rgba(36,27,67,0.06);
+  --shadow-brand: 0 6px 24px rgba(255,159,28,0.32);
+  --nav-bg: rgba(255,252,248,0.68); --sidebar-bg: #241B43; --sidebar-text: rgba(255,255,255,0.72);
+  --sidebar-active: rgba(255,159,28,0.2); --sidebar-indicator: #FF9F1C;
+  --btn-primary-bg: linear-gradient(135deg,#241B43,#3A2A63); --btn-primary-text: #FFAE45;
+  --btn-brand-bg: linear-gradient(135deg,#FF9F1C 0%,#F43F75 52%,#7C3AED 100%); --btn-brand-text: #fff;
+  --input-bg: rgba(255,253,252,0.85); --input-border: rgba(255,159,28,0.22); --input-focus: #FF9F1C;
+  --r: 16px; --r-sm: 10px; --r-xs: 7px; --r-full: 9999px;
+}
+
+/* ── HERITAGE SUNSET DARK (a calm Indian evening sky, not an inversion) ── */
+html.theme-heritage-sunset-dark {
+  --brand:        #FF9F1C;
+  --brand-dark:   #E8850A;
+  --brand-light:  rgba(255,159,28,0.16);
+  --link:         #FF9F1C; /* already AA vs dark surfaces (7.7:1+) — no darkening needed */
+  --accent:       #A78BFA;
+  --accent-light: rgba(167,139,250,0.16);
+  --teal:         #2DD4C4;
+  --coral:        #FF7A90;
+  --amber:        #FFAE45;
+  --green:        #4ADE80;
+
+  --bg:           #171329;
+  --bg2:          #1D1733;
+  --white:        #251D3E;
+  --surface:      rgba(37,29,62,0.88);
+  --surface-blur: rgba(23,19,41,0.88);
+  --glass:        rgba(255,255,255,0.05);
+  --glass-border: rgba(255,255,255,0.08);
+
+  --text:         #FFF9F4;
+  --text2:        rgba(255,249,244,0.82);
+  --text3:        rgba(255,249,244,0.58);
+  --text4:        rgba(255,249,244,0.48); /* SP-5-01: raised alpha from 0.38 (was 3.4:1) to 4.5:1+ */
+  --text5:        rgba(255,249,244,0.2);
+
+  --border:       rgba(255,255,255,0.08);
+  --border2:      rgba(255,255,255,0.12);
+  --divider:      rgba(255,255,255,0.06);
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow:    0 4px 16px rgba(0,0,0,0.45);
+  --shadow-lg: 0 20px 48px rgba(0,0,0,0.55);
+  --shadow-brand: 0 6px 24px rgba(255,159,28,0.35);
+
+  --nav-bg:       rgba(23,19,41,0.74);
+  --sidebar-bg:   #120F20;
+  --sidebar-text: rgba(255,249,244,0.6);
+  --sidebar-active: rgba(255,159,28,0.18);
+  --sidebar-indicator: #FF9F1C;
+
+  --btn-primary-bg:   linear-gradient(135deg,#FF9F1C,#F43F75);
+  --btn-primary-text: #171329;
+  --btn-brand-bg:     linear-gradient(135deg,#FF9F1C 0%,#F43F75 52%,#A78BFA 100%);
+  --btn-brand-text:   #fff;
+
+  --input-bg:     rgba(255,255,255,0.05);
+  --input-border: rgba(255,255,255,0.12);
+  --input-focus:  #FF9F1C;
+
+  --r: 16px;
+  --r-sm: 10px;
+  --r-xs: 7px;
+  --r-full: 9999px;
+}
+
+/* ── WARM SAFFRON ─────────────────────────────────────────────── */
+html.theme-saffron {
+  --brand:        #FF7A1A;
+  --brand-dark:   #CC5500;
+  --brand-light:  rgba(255,122,26,0.1);
+  --link:         #C25100; /* SP-5-01: AA-safe darkened --brand for small text */
+  --accent:       #1A0050;
+  --accent-light: rgba(26,0,80,0.08);
+  --teal:         #00B894;
+  --coral:        #FF4D6D;
+  --amber:        #FFB020;
+  --green:        #22C55E;
+
+  --bg:           #FFFAF5;
+  --bg2:          #FFF5ED;
+  --white:        #FFFFFF;
+  --surface:      rgba(255,255,255,0.75);
+  --surface-blur: rgba(255,250,245,0.85);
+  --glass:        rgba(255,255,255,0.7);
+  --glass-border: rgba(255,122,26,0.12);
+
+  --text:         #1A0050;
+  --text2:        #3D2B6B;
+  --text3:        #6B5A7E;
+  --text4:        #7D68A9; /* SP-5-01: darkened from #9E8EBF (was 2.97:1 on white) to 4.5:1+ */
+  --text5:        #C9BDE0;
+
+  --border:       rgba(255,122,26,0.12);
+  --border2:      rgba(26,0,80,0.12);
+  --divider:      rgba(26,0,80,0.06);
+
+  --shadow-sm: 0 1px 3px rgba(26,0,80,0.06), 0 1px 2px rgba(26,0,80,0.04);
+  --shadow:    0 4px 16px rgba(26,0,80,0.08), 0 1px 4px rgba(26,0,80,0.04);
+  --shadow-lg: 0 20px 48px rgba(26,0,80,0.12), 0 4px 12px rgba(26,0,80,0.06);
+  --shadow-brand: 0 6px 24px rgba(255,122,26,0.35);
+
+  --nav-bg:       rgba(255,250,245,0.68);
+  --sidebar-bg:   #1A0050;
+  --sidebar-text: rgba(255,255,255,0.7);
+  --sidebar-active: rgba(255,122,26,0.2);
+  --sidebar-indicator: #FF7A1A;
+
+  --btn-primary-bg:   linear-gradient(135deg,#1A0050,#2D1B69);
+  --btn-primary-text: #FF6B00;
+  --btn-brand-bg:     linear-gradient(135deg,#FF7A1A,#FF5C00);
+  --btn-brand-text:   #fff;
+
+  --input-bg:     rgba(255,250,245,0.8);
+  --input-border: rgba(255,122,26,0.2);
+  --input-focus:  #FF7A1A;
+
+  --r: 16px;
+  --r-sm: 10px;
+  --r-xs: 7px;
+  --r-full: 9999px;
+}
+
+/* ── MIDNIGHT AURORA (dark) ──────────────────────────────────── */
+html.theme-aurora {
+  --brand:        #00D4B4;
+  --brand-dark:   #00A88C;
+  --brand-light:  rgba(0,212,180,0.12);
+  --link:         #00D4B4; /* already AA vs dark surfaces (8.3:1+) — no darkening needed */
+  --accent:       #FF5066;
+  --accent-light: rgba(255,80,102,0.12);
+  --teal:         #00D4B4;
+  --coral:        #FF5066;
+  --amber:        #FFB020;
+  --green:        #22C55E;
+
+  --bg:           #080B14;
+  --bg2:          #0D1320;
+  --white:        #1a2236;
+  --surface:      rgba(255,255,255,0.05);
+  --surface-blur: rgba(8,11,20,0.85);
+  --glass:        rgba(255,255,255,0.04);
+  --glass-border: rgba(255,255,255,0.08);
+
+  --text:         rgba(255,255,255,0.95);
+  --text2:        rgba(255,255,255,0.8);
+  --text3:        rgba(255,255,255,0.55);
+  --text4:        rgba(255,255,255,0.47); /* SP-5-01: raised alpha from 0.35 (was 3.15:1) to 4.5:1+ */
+  --text5:        rgba(255,255,255,0.2);
+
+  --border:       rgba(255,255,255,0.08);
+  --border2:      rgba(255,255,255,0.12);
+  --divider:      rgba(255,255,255,0.06);
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow:    0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg: 0 20px 48px rgba(0,0,0,0.6);
+  --shadow-brand: 0 6px 24px rgba(0,212,180,0.4);
+
+  --nav-bg:       rgba(8,11,20,0.74);
+  --sidebar-bg:   #0a0e1a;
+  --sidebar-text: rgba(255,255,255,0.55);
+  --sidebar-active: rgba(0,212,180,0.15);
+  --sidebar-indicator: #00D4B4;
+
+  --btn-primary-bg:   linear-gradient(135deg,#00D4B4,#00B09A);
+  --btn-primary-text: #001a17;
+  --btn-brand-bg:     linear-gradient(135deg,#00D4B4,#00B09A);
+  --btn-brand-text:   #001a17;
+
+  --input-bg:     rgba(255,255,255,0.05);
+  --input-border: rgba(255,255,255,0.1);
+  --input-focus:  #00D4B4;
+}
+
+/* ── INK + LIME ──────────────────────────────────────────────── */
+html.theme-ink {
+  --brand:        #C8F135;
+  --brand-dark:   #9EC40A;
+  --brand-light:  rgba(200,241,53,0.15);
+  --link:         #637C09; /* SP-5-01: AA-safe darkened --brand (lime fails badly on white at 1.31:1) — same hue, olive-dark for small text */
+  --accent:       #FF5C4D;
+  --accent-light: rgba(255,92,77,0.1);
+  --teal:         #0BD4C1;
+  --coral:        #FF5C4D;
+  --amber:        #FFB020;
+  --green:        #22C55E;
+
+  --bg:           #F7F9FC;
+  --bg2:          #EEF2F8;
+  --white:        #FFFFFF;
+  --surface:      rgba(255,255,255,0.85);
+  --surface-blur: rgba(247,249,252,0.92);
+  --glass:        rgba(255,255,255,0.8);
+  --glass-border: rgba(13,17,23,0.08);
+
+  --text:         #0D1117;
+  --text2:        #1C2B3A;
+  --text3:        #4A5568;
+  --text4:        #617488; /* SP-5-01: darkened from #8899AA (was 2.92:1 on white) to 4.5:1+ */
+  --text5:        #B0BEC9;
+
+  --border:       rgba(13,17,23,0.08);
+  --border2:      rgba(13,17,23,0.12);
+  --divider:      rgba(13,17,23,0.05);
+
+  --shadow-sm: 0 1px 3px rgba(13,17,23,0.06), 0 1px 2px rgba(13,17,23,0.04);
+  --shadow:    0 4px 16px rgba(13,17,23,0.08);
+  --shadow-lg: 0 20px 48px rgba(13,17,23,0.12);
+  --shadow-brand: 0 6px 24px rgba(13,17,23,0.25);
+
+  --nav-bg:       rgba(255,255,255,0.68);
+  --sidebar-bg:   #0D1117;
+  --sidebar-text: rgba(255,255,255,0.6);
+  --sidebar-active: rgba(200,241,53,0.12);
+  --sidebar-indicator: #C8F135;
+
+  --btn-primary-bg:   #0D1117;
+  --btn-primary-text: #C8F135;
+  --btn-brand-bg:     #0D1117;
+  --btn-brand-text:   #C8F135;
+
+  --input-bg:     rgba(247,249,252,0.9);
+  --input-border: rgba(13,17,23,0.12);
+  --input-focus:  #0D1117;
+}
+
+/* ── GLOBAL BASE STYLES ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* SP-5-00 typography scale — documented per spec; existing inline styles
+   keep their own literal px values for now (SP-5-01 is the full design-
+   tokens retrofit), these vars exist for anything new to consume. */
+:root {
+  --font-body-mobile: 18px;
+  --font-body-desktop: 17px;
+  --font-small: 14px;
+  --font-label: 15px;
+  --font-title-small: 20px;
+  --font-title-medium: 26px;
+  --font-title-large: 34px;
+}
+
+/* SP-5-01 — spacing (4pt grid) and motion tokens, theme-independent.
+   Existing inline literal px/ms values are untouched for now; these vars
+   exist for anything new (incl. SP-5-02's motion language) to consume. */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+body {
+  /* Plus Jakarta Sans is the primary UI typeface app-wide; Noto Sans
+     Bengali/Devanagari cover those scripts before falling to system fonts. */
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Bengali', 'Noto Sans Devanagari', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: var(--font-body-mobile);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (min-width: 768px) {
+  body { font-size: var(--font-body-desktop); }
+}
+
+/* Glass effect utility */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text4); }
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skeleton shimmer (SP-5-03) — replaces the previously-referenced but
+   never-defined `pulse` animation (Home/Chats/Profile skeletons silently
+   rendered as static gray blocks). Gradient sweep, not a flat opacity
+   pulse, per the task's "shimmer" wording; theme-token based (--bg2/
+   --border) so it reads correctly in every theme incl. dark mode.
+   prefers-reduced-motion is already handled globally below. */
+.skeleton-bone {
+  background: linear-gradient(90deg, var(--bg2) 25%, var(--border) 50%, var(--bg2) 75%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ThemeBackdrop — permanent brand chrome (SP-5-12) */
+.spandik-heritage-horizon {
+  display: block;
+  height: clamp(130px, 18vw, 230px);
+}
+@media (max-width: 767px) {
+  .spandik-heritage-horizon { height: 125px; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── SP-5-15 semantic status tokens ─────────────────────────────
+   One place for danger/warning/success colours (they were ~50 raw hex
+   literals across components). Light values = the previous literals;
+   dark themes get readable, calmer variants. */
+:root {
+  --danger: #EF4444;
+  --danger-strong: #DC2626;
+  --danger-bg: #FEE2E2;
+  --danger-border: #FECACA;
+  --warning-bg: #FEF3C7;
+  --warning-text: #92400E;
+  --success: #22C55E;
+  /* Fills behind white text/icons (badges, destructive/warning buttons):
+     theme-invariant so white stays >=4.5:1 in dark themes too. */
+  --danger-fill: #DC2626;
+  --warning-fill: #B45309;
+}
+html.theme-heritage-sunset-dark, html.theme-aurora {
+  --danger: #F87171;
+  --danger-strong: #FCA5A5;
+  --danger-bg: rgba(239, 68, 68, 0.16);
+  --danger-border: rgba(239, 68, 68, 0.40);
+  --warning-bg: rgba(245, 158, 11, 0.16);
+  --warning-text: #FCD34D;
+  --success: #4ADE80;
+}
+
+/* ── SP-5-07 Easy Mode ──────────────────────────────────────────
+   One root attribute (set by authStore.applyEasyMode / main.tsx's
+   pre-render mirror), never a className — theme code overwrites the
+   html className wholesale. Declared after every theme block so these
+   equal-specificity overrides win in all five themes, light and dark.
+   Contrast: the two faintest text tiers collapse onto --text2, and
+   hairlines onto the stronger --border2 — same Heritage Sunset hues,
+   just less faint. Type: the app's many literal px font sizes can't all
+   move to tokens without a huge mechanical diff, so the whole app is
+   scaled one step via CSS zoom (text, spacing and touch targets grow
+   together — layout re-flows at the smaller effective width, so no
+   horizontal overflow). ponytail: global zoom, per-component type
+   tokens only if a surface proves it needs them. */
+html[data-easy-mode="1"] {
+  --text3: var(--text2);
+  --text4: var(--text2);
+  --border: var(--border2);
+  --divider: var(--border2);
+}
+html[data-easy-mode="1"] body { zoom: 1.15; }

@@ -1,0 +1,10 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://media.spandik.com https://api.spandik.com blob: data:; media-src 'self' https://media.spandik.com https://api.spandik.com blob:; connect-src 'self' https://api.spandik.com wss://chat.spandik.com wss://lc.spandik.com https://media.spandik.com https://challenges.cloudflare.com stun: turn:; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()
+
+# SP-5-09: the service worker must always be revalidated so a new deploy's
+# worker is detected (the shell it caches is network-first anyway).
+/sw.js
+  Cache-Control: no-cache

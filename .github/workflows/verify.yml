@@ -1,0 +1,55 @@
+# Rebuilds the published snapshot on a fresh runner, requires it to match the
+# live site byte for byte, and records the manifest in Sigstore's public Rekor
+# log — signed keylessly with this workflow's short-lived GitHub OIDC identity
+# (no stored signing key or secret).
+name: verify-release
+on:
+  push:
+    branches: [main]
+    paths: [SOURCE_COMMIT]
+  workflow_dispatch:
+permissions:
+  contents: write   # commit releases/<commit>/ and tag (ephemeral GITHUB_TOKEN)
+  id-token: write   # keyless Sigstore signing
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --no-audit --no-fund
+      - name: Build (same command and variables as production)
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://api.spandik.com
+          VITE_CHAT_WS_URL: wss://chat.spandik.com
+          VITE_LC_WS_URL: wss://lc.spandik.com
+          VITE_MEDIA_URL: https://media.spandik.com
+        run: npx vite build
+      - name: Manifest + byte-for-byte comparison with the live site
+        run: |
+          set -euo pipefail
+          C=$(cat SOURCE_COMMIT)
+          echo "C=$C" >> "$GITHUB_ENV"
+          mkdir -p "releases/$C"
+          node tools/release-manifest.mjs frontend/dist "$C" > "releases/$C/manifest.json"
+          node tools/release-manifest.mjs --compare frontend/dist https://app.spandik.com
+      - uses: sigstore/cosign-installer@v3
+      - name: Keyless signature → Rekor
+        run: |
+          set -euo pipefail
+          cosign sign-blob --yes --bundle "releases/$C/manifest.sigstore.json" "releases/$C/manifest.json"
+          IDX=$(node -e "const b=require('./releases/$C/manifest.sigstore.json');const e=(b.verificationMaterial?.tlogEntries||[])[0]||{};console.log(e.logIndex ?? b.rekorBundle?.Payload?.logIndex ?? '')")
+          test -n "$IDX"
+          printf 'Rekor log index: %s\nhttps://search.sigstore.dev/?logIndex=%s\nroot: %s\n' "$IDX" "$IDX" "$(node -e "console.log(require('./releases/$C/manifest.json').root)")" > "releases/$C/rekor.txt"
+          cat "releases/$C/rekor.txt" >> "$GITHUB_STEP_SUMMARY"
+      - name: Record the release
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "releases/$C"
+          git commit -m "release $C: manifest + Rekor entry"
+          git tag "$C"
+          git push origin HEAD:main --tags
