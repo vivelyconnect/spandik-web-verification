@@ -107,7 +107,7 @@ export default function Avatar({ src, name, size = 'md', online, ring, style }: 
               display: 'block',
               // A transparent / very pale photo would otherwise vanish into the
               // surface and read as "no avatar" (UAT finding) — give it a disc.
-              background: 'var(--border)',
+              background: 'var(--text4)', // mid-tone in every theme: pale and dark art both show
             }}
             onError={(e) => {
               // Fallback to initials on error
