@@ -11,7 +11,14 @@ export const ARGON2 = { memorySize: 19456, iterations: 2, parallelism: 1, hashLe
 export const KDF_V3_TAG = OPRF_TAG
 
 export class OprfError extends Error {
-  constructor(public status: number, message: string) { super(message) }
+  constructor(public status: number, message: string, public retryAfterSec?: number) { super(message) }
+}
+
+// Whole minutes until a rate-limited request may be retried (Retry-After, in
+// seconds, from an OprfError or an axios error), or null when unknown.
+export function retryAfterMinutes(err: any): number | null {
+  const sec = Number(err?.retryAfterSec ?? err?.response?.headers?.['retry-after'])
+  return sec > 0 ? Math.ceil(sec / 60) : null
 }
 
 // One restore can need several derivations with the same PIN (current
@@ -39,7 +46,7 @@ async function evaluate(pin: string, version: number | undefined, accessToken: s
     body: JSON.stringify({ blinded: b64(request.serialize()), ...(version ? { version } : {}) }),
   })
   const data = await res.json().catch(() => null)
-  if (!res.ok || !data?.data?.evaluated) throw new OprfError(res.status, data?.error || 'OPRF evaluation failed')
+  if (!res.ok || !data?.data?.evaluated) throw new OprfError(res.status, data?.error || 'OPRF evaluation failed', Number(res.headers.get('Retry-After')) || undefined)
   const [out] = await client.finalize(finalization, Evaluation.deserialize(suite, unb64(data.data.evaluated), CryptoNoble))
   return { version: data.data.version, out }
 }

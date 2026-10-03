@@ -234,10 +234,16 @@ export function clearE2EKeys(userId: string): void {
   forgetWrapKey(userId).catch(() => {})
 }
 
-// Logout (Wave 3A step 4): remove this device's copy only when a server
-// backup can bring it back; an unprotected key is the only copy and stays.
+// Removes this device's copy only when a server backup can bring it back; an
+// unprotected key is the only copy and stays.
 export function clearLocalChatKeys(userId: string): void {
   if (getStored(userId)?.has_passphrase) clearE2EKeys(userId)
+}
+
+// Ordinary sign-out on a trusted device (UAT remediation): the wrapped vault
+// stays at rest; only the unwrapped in-memory copies are dropped.
+export function lockLocalKeys(userId: string): void {
+  memKeys.delete(userId); memPub.delete(userId); memHistory.delete(userId)
 }
 
 
@@ -370,27 +376,24 @@ export async function restoreWithPassphrase(
   saltB64: string,
   accessToken?: string
 ): Promise<boolean> {
-  try {
-    const oprf: OprfContext | undefined = accessToken ? { accessToken } : undefined
-    const key = await deriveKeyFromSaltField(passphrase, saltB64, oprf)
-    const privateKey = nacl.secretbox.open(decodeBase64(encryptedKeyB64), decodeBase64(nonceB64), key)
-    if (!privateKey) return false
-    localStorage.setItem(`${KEYS_PREFIX}${userId}_salt`, saltB64)
-    await storeLocalKey(userId, privateKey, { private_key_encrypted: encryptedKeyB64, private_key_nonce: nonceB64, has_passphrase: true })
-    // SP-1-09: best-effort — also recover any previous key versions this
-    // account rotated away from, so messages received before a past
-    // rotation still decrypt. Never blocks/fails the main restore above;
-    // only works for history entries protected by this SAME secret (a PIN
-    // change between rotations means some entries just won't recover —
-    // acceptable, matches the task's "where the data exists" framing).
-    if (oprf) fetchAndCacheKeyHistory(userId, passphrase, oprf).catch(() => {})
-    return true
-  } catch (e) {
-    // SP-14-02: an OPRF 429 is the guess limit, not a wrong PIN — rethrow so
-    // the caller says "try later" instead of inviting another guess.
-    if (e instanceof OprfError && e.status === 429) throw e
-    return false
-  }
+  // false ONLY when the secret was actually evaluated and did not open the
+  // backup. Anything else — no session, OPRF/network failure, a 429 guess
+  // limit, a module that failed to load, a local store failure — throws, so
+  // the caller never says "Wrong PIN" for a PIN it never checked (UAT finding).
+  const oprf: OprfContext | undefined = accessToken ? { accessToken } : undefined
+  const key = await deriveKeyFromSaltField(passphrase, saltB64, oprf)
+  const privateKey = nacl.secretbox.open(decodeBase64(encryptedKeyB64), decodeBase64(nonceB64), key)
+  if (!privateKey) return false
+  localStorage.setItem(`${KEYS_PREFIX}${userId}_salt`, saltB64)
+  await storeLocalKey(userId, privateKey, { private_key_encrypted: encryptedKeyB64, private_key_nonce: nonceB64, has_passphrase: true })
+  // SP-1-09: best-effort — also recover any previous key versions this
+  // account rotated away from, so messages received before a past
+  // rotation still decrypt. Never blocks/fails the main restore above;
+  // only works for history entries protected by this SAME secret (a PIN
+  // change between rotations means some entries just won't recover —
+  // acceptable, matches the task's "where the data exists" framing).
+  if (oprf) fetchAndCacheKeyHistory(userId, passphrase, oprf).catch(() => {})
+  return true
 }
 
 
@@ -710,19 +713,18 @@ export async function restoreWithRecoveryKey(
   recoveryNonceB64: string,
   publicKey: string
 ): Promise<boolean> {
+  let privateKey: Uint8Array | null
   try {
     const key = await deriveKeyFromRecoveryKey(recoveryKey)
-    const privateKey = nacl.secretbox.open(decodeBase64(recoveryEncryptedB64), decodeBase64(recoveryNonceB64), key)
-    if (!privateKey) return false
-    // Wave 3A step 4: the recovered key must be the account's CURRENT key
-    // (a recovery blob left over from before a key change would otherwise
-    // install a key that can't read anything new, silently).
-    if (encodeBase64(nacl.box.keyPair.fromSecretKey(privateKey).publicKey) !== publicKey) return false
-    await storeLocalKey(userId, privateKey, { private_key_encrypted: '', private_key_nonce: '', has_passphrase: true })
-    return true
-  } catch {
-    return false
-  }
+    privateKey = nacl.secretbox.open(decodeBase64(recoveryEncryptedB64), decodeBase64(recoveryNonceB64), key)
+  } catch { return false } // malformed key text = a wrong recovery key
+  if (!privateKey) return false
+  // Wave 3A step 4: the recovered key must be the account's CURRENT key
+  // (a recovery blob left over from before a key change would otherwise
+  // install a key that can't read anything new, silently).
+  if (encodeBase64(nacl.box.keyPair.fromSecretKey(privateKey).publicKey) !== publicKey) return false
+  await storeLocalKey(userId, privateKey, { private_key_encrypted: '', private_key_nonce: '', has_passphrase: true }) // a store failure throws: not "wrong key"
+  return true
 }
 
 // ── SP-14-05: Maximum privacy (no server backup) ───────────────
@@ -790,18 +792,14 @@ export async function changeChatPin(
   await unlockLocalKeys(userId)
   const local = getPrivateKey(userId)
   if (!local) return false
-  try {
-    const API = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) || 'https://api.spandik.com'
-    const res = await fetch(`${API}/users/me/e2e-keys`, { headers: { Authorization: `Bearer ${accessToken}` } })
-    const data = await res.json().catch(() => null)
-    const b = data?.data
-    if (!res.ok || !b?.encrypted_private_key || !b.nonce || !b.salt) return false
-    const opened = nacl.secretbox.open(decodeBase64(b.encrypted_private_key), decodeBase64(b.nonce), await deriveKeyFromSaltField(oldPin, b.salt, { accessToken }))
-    if (!opened || encodeBase64(opened) !== encodeBase64(local)) return false
-  } catch (e) {
-    if (e instanceof OprfError && e.status === 429) throw e
-    return false
-  }
+  const API = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) || 'https://api.spandik.com'
+  const res = await fetch(`${API}/users/me/e2e-keys`, { headers: { Authorization: `Bearer ${accessToken}` } })
+  // A failed/limited fetch never checked the PIN — throw, never "incorrect PIN".
+  if (!res.ok) throw new OprfError(res.status, 'Backup fetch failed', Number(res.headers.get('Retry-After')) || undefined)
+  const b = (await res.json().catch(() => null))?.data
+  if (!b?.encrypted_private_key || !b.nonce || !b.salt) return false
+  const opened = nacl.secretbox.open(decodeBase64(b.encrypted_private_key), decodeBase64(b.nonce), await deriveKeyFromSaltField(oldPin, b.salt, { accessToken }))
+  if (!opened || encodeBase64(opened) !== encodeBase64(local)) return false
   return (await protectChatKeyBackup(userId, newPin, accessToken)) === 'ok'
 }
 

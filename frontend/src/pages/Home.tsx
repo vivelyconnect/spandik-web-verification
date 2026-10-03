@@ -123,7 +123,7 @@ export default function Home() {
       <div style={{ display: 'flex', gap: 10, overflowX: 'auto', marginBottom: 16, paddingBottom: 4, scrollbarWidth: 'none', height: 160 }}>
         {/* Add story */}
         <StoryBubble
-          src={user?.profile_pic_url} name="" isAdd
+          avatarSrc={user?.profile_pic_url} name={user?.first_name || ''} isAdd
           onClick={() => storyInput.current?.click()}
         />
         {storyGroups.map((group: any, i: number) => (
@@ -209,37 +209,49 @@ function StoryBubble({ src, avatarSrc, name, isAdd, hasStory, onClick }: {
   src?: string | null; avatarSrc?: string | null; name: string; isAdd?: boolean; hasStory?: boolean; onClick?: () => void
 }) {
   const t = useT()
+  // Add tile (UAT finding: the label overlapped the user's full-card photo):
+  // the photo is a contained circle with a + badge, and the label gets its
+  // own area below it (up to 2 lines, for longer hi/bn labels) — never text
+  // on top of a picture. Other people's cards keep their story preview.
+  if (isAdd) return (
+    <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={onClick} aria-label={t('feed.addStory')}
+      style={{ flexShrink: 0, cursor: 'pointer', width: 96, height: 148, borderRadius: 14, overflow: 'hidden', boxShadow: 'var(--shadow)', border: 'none', padding: '0 6px 10px', font: 'inherit', background: 'var(--bg2)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'relative', width: 60, height: 60 }}>
+          {avatarSrc
+            ? <Avatar src={avatarSrc} name={name} size={60} />
+            : <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--white)', border: '1px solid var(--border)' }} />}
+          <div style={{ position: 'absolute', right: -4, bottom: -4, width: 26, height: 26, borderRadius: '50%', background: 'var(--brand)', color: 'var(--sidebar-bg)', border: '2px solid var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Plus size={16} strokeWidth={3} aria-hidden />
+          </div>
+        </div>
+      </div>
+      <div style={{ width: '100%', minHeight: 28, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 11, lineHeight: '14px', fontWeight: 600, color: 'var(--text)', textAlign: 'center', overflowWrap: 'anywhere' }}>
+        {t('feed.addStory')}
+      </div>
+    </motion.button>
+  )
   return (
     <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={onClick}
-      aria-label={isAdd ? t('feed.addStory') : hasStory ? t('story.view', { name }) : name}
+      aria-label={hasStory ? t('story.view', { name }) : name}
       style={{ flexShrink: 0, cursor: 'pointer', width: 96, height: 148, borderRadius: 14, overflow: 'hidden', position: 'relative', boxShadow: 'var(--shadow)', border: 'none', padding: 0, font: 'inherit', background: 'none' }}>
       {/* Background */}
       <div style={{
         position: 'absolute', inset: 0,
         background: src
           ? `url(${src}) center/cover no-repeat`
-          : isAdd
-            ? 'var(--bg2)'
-            : 'linear-gradient(135deg, var(--brand), var(--accent))',
+          : 'linear-gradient(135deg, var(--brand), var(--accent))',
       }} />
       {/* Overlay */}
-      {!isAdd && <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.5) 100%)' }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.5) 100%)' }} />
       {/* Owner avatar — SP-5-08: the person's own profile photo (was the
           story media itself), with the shared story ring drawn inside a
           fixed 36px box, so it can never clip or shift the card. */}
-      {!isAdd && (
-        <Avatar src={avatarSrc} name={name} size={36} ring={hasStory}
-          style={{ position: 'absolute', top: 8, left: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
-      )}
-      {/* Add icon */}
-      {isAdd && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--sidebar-bg)', fontWeight: 700 }}><Plus size={22} strokeWidth={2.5} aria-hidden /></div>
-        </div>
-      )}
+      <Avatar src={avatarSrc} name={name} size={36} ring={hasStory}
+        style={{ position: 'absolute', top: 8, left: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
       {/* Name */}
-      <div style={{ position: 'absolute', bottom: 8, left: 6, right: 6, fontSize: 11, fontWeight: 600, color: isAdd ? 'var(--text)' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textShadow: isAdd ? 'none' : '0 1px 3px rgba(0,0,0,0.5)' }}>
-        {isAdd ? t('feed.addStory') : name}
+      <div style={{ position: 'absolute', bottom: 8, left: 6, right: 6, fontSize: 11, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
+        {name}
       </div>
     </motion.button>
   )

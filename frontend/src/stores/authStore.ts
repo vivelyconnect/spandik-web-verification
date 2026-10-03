@@ -52,7 +52,11 @@ interface AuthState {
   setUser: (user: Partial<AuthUser>) => void
   setAccessToken: (token: string) => void
   setTheme: (theme: string) => void
-  logout: () => void
+  // Default = any session end that is NOT the person's own ordinary sign-out
+  // (remote revoke / expired session, sign-out-all, deactivate, delete,
+  // "forget chat key"): the local chat vault is wiped. `keepChatKeys` is only
+  // for the ordinary Sign out on a trusted device.
+  logout: (opts?: { keepChatKeys?: boolean }) => void
 }
 
 // SP-15-19: the refresh token no longer lives here (or anywhere in JS-
@@ -61,15 +65,19 @@ interface AuthState {
 // persisting is what lets a cold reload know "this browser was previously
 // logged in, attempt a silent refresh" (see main.tsx/App.tsx) without ever
 // holding the actual credential in JS.
-// Wave 3A step 4: while signed in, the chat private key (and any decrypted
-// older keys) sit in this browser's storage (wrapped since Wave 3B, see
-// utils/keyVault.ts) — the Chat PIN protects only the SERVER backup
-// (utils/e2e.ts owns these key names). On
-// logout they are removed, so a shared or later-stolen browser profile no
-// longer holds them; the next sign-in restores with the Chat PIN like a new
-// device. Only when a server backup exists (has_passphrase) — otherwise this
-// device holds the only copy and clearing it would destroy the account's chat
-// identity. Contact pins / contact public keys are public data and stay.
+// Wave 3A step 4: the chat private key (and any decrypted older keys) sit in
+// this browser's storage, wrapped since Wave 3B by a non-extractable
+// per-account key (utils/keyVault.ts); the Chat PIN protects only the SERVER
+// backup (utils/e2e.ts owns these key names). Trusted device (UAT remediation,
+// 2026-10-03): an ordinary Sign out KEEPS that wrapped vault, so the same
+// account signing in again on this browser needs no Chat PIN; the PIN itself
+// is never stored. Every other session end — a remote revoke or expired
+// session seen online, sign-out-all, deactivate/delete, or Settings → "Sign
+// out and remove chat key" — removes it, so the next sign-in restores with
+// the Chat PIN like a new device. Removal happens only when a server backup
+// exists (has_passphrase) — otherwise this device holds the only copy and
+// clearing it would destroy the account's chat identity. Contact pins /
+// contact public keys are public data and stay.
 // Kept here, not in e2e.ts, so the auth store doesn't pull tweetnacl into the
 // main bundle. Wave 3B (Option B): the key is stored wrapped — logout also
 // deletes the wrapping key and the unwrapped in-memory copy (the e2e module
@@ -122,10 +130,13 @@ export const useAuthStore = create<AuthState>()(
         if (current) set({ user: { ...current, theme } })
       },
 
-      logout: () => {
+      logout: (opts) => {
         const userId = get().user?.id
         set({ user: null, accessToken: null, deviceId: null })
-        if (userId && typeof localStorage !== 'undefined') clearLocalChatKeys(userId)
+        if (userId && typeof localStorage !== 'undefined') {
+          if (opts?.keepChatKeys) import('../utils/e2e').then(m => m.lockLocalKeys(userId)).catch(() => {})
+          else clearLocalChatKeys(userId)
+        }
         // SP-5-07: Easy Mode is per-account — never carry it to the next
         // person who signs in on this browser.
         applyEasyMode(false)

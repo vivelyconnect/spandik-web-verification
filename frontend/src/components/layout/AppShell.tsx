@@ -220,7 +220,7 @@ export default function AppShell() {
 
   async function handleLogout() {
     try { await authApi.logout({ all_devices: false }) } catch {}
-    logout()
+    logout({ keepChatKeys: true }) // trusted device: the wrapped chat key stays
     navigate('/login')
   }
 
@@ -535,17 +535,20 @@ export default function AppShell() {
         <MobileTab to="/chats" icon={<MessageCircle size={22} aria-hidden />} label={t('nav.chats')} badge={totalUnreadChat} />
 
         {/* Profile tab — navigates to profile page */}
+        {/* Same box as MobileTab (top-stacked 8px/3px gap, 22px glyph slot,
+            inherited line-height) so the avatar and label line up with the
+            icon tabs — a centred/min-height button sat off their rhythm. */}
         <button type="button" aria-expanded={showMobileSheet}
-          style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '8px 0 4px', cursor: 'pointer', position: 'relative', background: 'none', border: 'none', fontFamily: 'inherit', minHeight: 44 }}
+          style={{ ...MOBILE_TAB_BOX, cursor: 'pointer', position: 'relative', background: 'none', border: 'none', fontFamily: 'inherit', lineHeight: 'inherit', color: 'var(--text4)' }}
           onClick={() => setShowMobileSheet(!showMobileSheet)}>
           <div style={{ position: 'relative' }}>
             {/* SP-5-14: the notification badge that used to live here moved
                 to the dedicated, labeled bell in the top bar — an unlabeled
                 red dot on this avatar would now duplicate that count with
                 no visible text explaining what it means. */}
-            <Avatar src={user?.profile_pic_url} name={user?.first_name || 'U'} size={24} />
+            <Avatar src={user?.profile_pic_url} name={user?.first_name || 'U'} size={MOBILE_TAB_GLYPH} />
           </div>
-          <span style={{ fontSize: 9.5, fontWeight: 500, color: 'var(--text4)' }}>{easyMode ? t('nav.profile') : t('nav.you')}</span>
+          <span style={{ fontSize: 9.5, fontWeight: 500 }}>{easyMode ? t('nav.profile') : t('nav.you')}</span>
         </button>
       </nav>
 
@@ -720,11 +723,14 @@ export default function AppShell() {
   )
 }
 
+// One box for every bottom-nav item, incl. the "You" avatar button.
+const MOBILE_TAB_BOX: React.CSSProperties = { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '8px 0 4px' }
+const MOBILE_TAB_GLYPH = 22 // icon size; the avatar uses the same slot
+
 function MobileTab({ to, icon, label, end, badge }: { to: string; icon: React.ReactNode; label: string; end?: boolean; badge?: number }) {
   return (
     <NavLink to={to} end={end} style={({ isActive }) => ({
-      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-      gap: 3, padding: '8px 0 4px', textDecoration: 'none',
+      ...MOBILE_TAB_BOX, textDecoration: 'none',
       color: isActive ? 'var(--link)' : 'var(--text4)', transition: 'color 0.15s',
     })}>
       {({ isActive }) => (

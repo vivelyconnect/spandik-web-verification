@@ -9,6 +9,7 @@ import { m as motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '../../stores/authStore'
 import { usePinModalStore } from '../../stores/pinModalStore'
 import { hasKeys } from '../../utils/e2e'
+import { retryAfterMinutes } from '../../utils/pinOprf'
 import { api } from '../../utils/api'
 import PinInput from './PinInput'
 import toast from 'react-hot-toast'
@@ -118,7 +119,7 @@ export default function PinModal({ onComplete }: { onComplete?: () => void }) {
         ok = await restoreWithRecoveryKey(user!.id, recoveryInput, recovery_encrypted, recovery_nonce, identity_key)
       } else {
         const { restoreWithPassphrase } = await import('../../utils/e2e')
-        ok = await restoreWithPassphrase(user!.id, mode === 'passphrase' ? passphrase : pin, encrypted_private_key, nonce, salt, accessToken || undefined)
+        ok = await restoreWithPassphrase(user!.id, mode === 'passphrase' ? passphrase : pin, encrypted_private_key, nonce, salt, useAuthStore.getState().accessToken || undefined) // current token, not this render's
       }
 
       if (!ok) {
@@ -134,14 +135,15 @@ export default function PinModal({ onComplete }: { onComplete?: () => void }) {
       setShow(false)
       onComplete?.()
     } catch (err: any) {
-      // Two guess limits answer 429: the backup fetch (5 / 15 min) and, for
-      // KDF v3, the PIN OPRF itself (8 / hour, 24 / day — SP-14-02).
+      // Nothing here evaluated the secret — never "Wrong PIN" (UAT finding).
+      // 429: the PIN OPRF guess limit (8 / hour, 24 / day — SP-14-02) or the
+      // backup-fetch budget; Retry-After says when to try again.
       if (err?.response?.status === 429 || err?.status === 429) {
-        setError(t('pin.tooManyAttempts'))
+        const n = retryAfterMinutes(err)
+        setError(n ? t('pin.rateLimitedRetryIn', { n: String(n) }) : t('pin.tooManyAttempts'))
       } else {
-        setError(t('pin.couldNotRestoreKeys'))
+        setError(mode === 'recovery' ? t('pin.couldNotRestoreKeys') : t('pin.couldNotCheckPin'))
       }
-      setPin('')
     } finally { setLoading(false) }
   }
 

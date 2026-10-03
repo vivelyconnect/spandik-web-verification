@@ -10,6 +10,7 @@ import { m as motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '../../stores/authStore'
 import { usePinModalStore } from '../../stores/pinModalStore'
 import { hasPassphrase, readServerBackup, backupNeedsUpgrade, upgradeChatBackup, unlockLocalKeys } from '../../utils/e2e'
+import { retryAfterMinutes } from '../../utils/pinOprf'
 import { api } from '../../utils/api'
 import PinInput from './PinInput'
 import toast from 'react-hot-toast'
@@ -57,7 +58,7 @@ export default function BackupUpgradePrompt() {
       }
       let ok = false
       try { ok = await upgradeChatBackup(user!.id, pin, accessToken || '') } catch (err: any) {
-        setError(err?.status === 429 ? t('pin.tooManyAttempts') : t('pin.somethingWentWrongTryAgain')); return
+        setError(err?.status === 429 ? (retryAfterMinutes(err) ? t('pin.rateLimitedRetryIn', { n: String(retryAfterMinutes(err)) }) : t('pin.tooManyAttempts')) : t('pin.couldNotCheckPin')); return
       }
       if (!ok) { setError(t('pin.wrongPin')); setPin(''); return }
       toast.success(t('pin.backupUpgradedToast'))

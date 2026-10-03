@@ -1,6 +1,6 @@
 // src/pages/Settings.tsx
 import { useState, useEffect, useRef } from 'react'
-import { Check, Download, Hash, Key, KeyRound, Lock, PauseCircle, ShieldOff, Signal, Trash2, TriangleAlert, Type, X } from 'lucide-react'
+import { Check, Download, Hash, Key, KeyRound, Lock, LogOut, PauseCircle, ShieldOff, Signal, Trash2, TriangleAlert, Type, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { m as motion, AnimatePresence } from 'framer-motion'
@@ -9,7 +9,8 @@ import { usePinModalStore } from '../stores/pinModalStore'
 import { useDataSaverStore } from '../stores/dataSaverStore'
 import Avatar from '../components/ui/Avatar'
 import { userApi, authApi, api } from '../utils/api'
-import { clearE2EKeys, protectChatKeyBackup, changeChatPin, generateRecoveryKey, hasKeys, readServerBackup, maxPrivacyKey, setMaxPrivacy, unlockLocalKeys } from '../utils/e2e'
+import { clearE2EKeys, protectChatKeyBackup, changeChatPin, generateRecoveryKey, hasKeys, hasPassphrase, readServerBackup, maxPrivacyKey, setMaxPrivacy, unlockLocalKeys } from '../utils/e2e'
+import { retryAfterMinutes } from '../utils/pinOprf'
 import PinInput from '../components/chat/PinInput'
 import CopyButton from '../components/ui/CopyButton'
 import toast from 'react-hot-toast'
@@ -288,6 +289,14 @@ export default function Settings() {
   // "Sign out from all devices" action below) — never a second endpoint.
   async function handleLogout() {
     try { await authApi.logout() } catch { /* cookies are cleared client-side regardless */ }
+    logout({ keepChatKeys: true }) // trusted device: the wrapped chat key stays
+    navigate('/login')
+  }
+
+  // Shared/public device: sign out AND remove this browser's chat key (the
+  // default logout wipes it); the next sign-in needs the Chat PIN.
+  async function handleForgetDeviceKey() {
+    try { await authApi.logout() } catch { /* cookies are cleared client-side regardless */ }
     logout()
     navigate('/login')
   }
@@ -537,7 +546,7 @@ export default function Settings() {
       let ok = false
       try { ok = await changeChatPin(user.id, oldPin, newPin, accessToken) } catch (err: any) {
         // SP-14-02: the PIN-guess limit (OPRF) — not a wrong PIN
-        setChangePinError(err?.status === 429 ? t('pin.tooManyAttempts') : t('pin.somethingWentWrongTryAgain')); return
+        setChangePinError(err?.status === 429 ? (retryAfterMinutes(err) ? t('pin.rateLimitedRetryIn', { n: String(retryAfterMinutes(err)) }) : t('pin.tooManyAttempts')) : t('pin.couldNotCheckPin')); return
       }
       if (!ok) { setChangePinError(t('settings.currentPinIncorrect')); return }
       setShowChangePin(false)
@@ -857,6 +866,12 @@ export default function Settings() {
               {user?.id && hasKeys(user.id) && backupMode && accessToken && (
                 <MaxPrivacySection userId={user.id} accessToken={accessToken} on={backupMode === 'max_privacy'}
                   onChange={on => { setBackupMode(on ? 'max_privacy' : 'standard'); if (!on) window.location.reload() }} />
+              )}
+              {/* Only when a server backup / key can bring it back — never strand the only copy. */}
+              {user?.id && hasKeys(user.id) && hasPassphrase(user.id) && (
+                <InfoCard icon={<LogOut size={20} aria-hidden />} title={t('settings.forgetDeviceKeyTitle')} desc={t('settings.forgetDeviceKeyDesc')}>
+                  <button style={actionBtn} onClick={handleForgetDeviceKey}>{t('settings.forgetDeviceKeyBtn')}</button>
+                </InfoCard>
               )}
 
               {user?.id && !hasKeys(user.id) && (
