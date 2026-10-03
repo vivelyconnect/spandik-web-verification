@@ -9,6 +9,7 @@ import Avatar from '../components/ui/Avatar'
 import { MessageCircle, Search, SquarePen, UserX, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useT } from '../i18n/useT'
+import { apiAgeMs } from '../utils/time'
 
 export default function Chats() {
   const navigate  = useNavigate()
@@ -243,8 +244,8 @@ function ThreadRow({ thread, currentUserId, onClick }: { thread: any; currentUse
   const isPending = thread.request_status === 'pending'
 
   const timeAgo = (d: string) => {
-    if (!d) return ''
-    const diff = Date.now() - new Date(d).getTime()
+    const diff = apiAgeMs(d)
+    if (Number.isNaN(diff)) return ''
     if (diff < 60000) return 'now'
     if (diff < 3600000) return `${Math.floor(diff/60000)}m`
     if (diff < 86400000) return `${Math.floor(diff/3600000)}h`

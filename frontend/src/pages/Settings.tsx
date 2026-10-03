@@ -18,6 +18,7 @@ import { SUPPORTED_UI_LANGUAGES, type StringKey } from '../i18n/strings'
 import Lockup from '../components/ui/Lockup'
 import VerifyEmailPrompt from '../components/auth/VerifyEmailPrompt'
 import InterestPicker from '../components/onboarding/InterestPicker'
+import { apiAgeMs } from '../utils/time'
 
 // SP-11-09A: desc holds the StringKey (not the English text) since THEMES is
 // a module-level constant outside the component — t() is called at render.
@@ -1164,11 +1165,12 @@ export default function Settings() {
 }
 
 // SP-11-04: same small per-file convention as Buzz.tsx/PostDetail.tsx's own
-// timeAgo — not centralized, matching this codebase's established pattern.
+// timeAgo; API timestamps are parsed centrally by utils/time.ts (apiAgeMs).
 // SP-11-09A: takes `t` (this module-level function has no hook access of its
 // own) so the "ago" text is translated — smallest change per the i18n brief.
 function deviceTimeAgo(d: string, t: ReturnType<typeof useT>): string {
-  const diff = Date.now() - new Date(d).getTime()
+  const diff = apiAgeMs(d)
+  if (Number.isNaN(diff)) return ''
   if (diff < 60000) return t('settings.justNow')
   if (diff < 3600000) return t('settings.minutesAgo', { n: String(Math.floor(diff / 60000)) })
   if (diff < 86400000) return t('settings.hoursAgo', { n: String(Math.floor(diff / 3600000)) })

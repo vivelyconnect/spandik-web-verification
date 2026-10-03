@@ -9,6 +9,7 @@ import { useT } from '../../i18n/useT'
 import { Pause, Play, Smile, X } from 'lucide-react'
 import { useDataSaverStore } from '../../stores/dataSaverStore'
 import { buildDelivery } from '../../utils/mediaDelivery'
+import { apiAgeMs } from '../../utils/time'
 
 // SP-11-07: present (object or null) only when this story is itself a
 // share-to-story (repost_id set on the underlying post) — see
@@ -142,7 +143,8 @@ export default function StoryViewer({ groups, initialGroupIndex = 0, onClose }: 
   }
 
   const timeAgo = (d: string) => {
-    const diff = Date.now() - new Date(d).getTime()
+    const diff = apiAgeMs(d)
+    if (Number.isNaN(diff)) return ''
     if (diff < 3600000) return t('story.minutesAgo', { n: String(Math.floor(diff/60000)) })
     return t('story.hoursAgo', { n: String(Math.floor(diff/3600000)) })
   }

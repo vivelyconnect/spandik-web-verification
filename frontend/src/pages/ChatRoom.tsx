@@ -16,6 +16,7 @@ import { ArrowLeft, Info, Ban, ShieldCheck, CircleAlert, Clock, Ellipsis, Flag, 
 import ReportModal from '../components/ui/ReportModal'
 import toast from 'react-hot-toast'
 import { useT } from '../i18n/useT'
+import { parseApiTime } from '../utils/time'
 
 // SP-14-03: only loaded when someone opens it (carries the QR encoder)
 const SafetyNumberModal = lazy(() => import('../components/chat/SafetyNumberModal'))
@@ -394,7 +395,8 @@ function MessageBubble({ msg, isMe, showAvatar, senderPic, senderName, allSeen, 
   onRetry: (tempId: string) => void; onDelete: (messageId: string, forEveryone: boolean) => void
 }) {
   const t = useT()
-  const timeStr = new Date(msg.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true })
+  const sentAt = parseApiTime(msg.created_at)
+  const timeStr = Number.isNaN(sentAt) ? '' : new Date(sentAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true })
   const [showActions, setShowActions] = useState(false)
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false)
   const [showReport, setShowReport] = useState(false)

@@ -19,6 +19,7 @@ import { PRESS_TAP, burstPieces, burstTransition } from '../../motion/presets'
 import { hapticTap } from '../../motion/haptics'
 import Overlay from '../ui/Overlay'
 import { Bookmark, Ellipsis, Flag, Link as LinkIcon, MapPin, MessageCircle, Pencil, Share2, ThumbsUp, Trash2 } from 'lucide-react'
+import { apiAgeMs } from '../../utils/time'
 
 const REACTIONS = [
   { type: 'like', emoji: '👍' }, { type: 'love', emoji: '❤️' },
@@ -63,7 +64,7 @@ export default function PostCard({ post, onUpdate, onDelete }: { post: any; onUp
   const isMe    = user?.id === post.author?.id
   const authorPath = `/u/${post.author?.username}`
   const authorName = `${post.author?.first_name || ''} ${post.author?.last_name || ''}`.trim()
-  const canEdit = isMe && ((Date.now() - new Date(post.created_at).getTime()) < 15 * 60 * 1000)
+  const canEdit = isMe && apiAgeMs(post.created_at) < 15 * 60 * 1000 // NaN (malformed) → false
 
   function onPressStart() {
     longPressTriggered.current = false
@@ -160,7 +161,8 @@ export default function PostCard({ post, onUpdate, onDelete }: { post: any; onUp
   }
 
   const timeAgo = (d: string) => {
-    const diff = Date.now() - new Date(d).getTime()
+    const diff = apiAgeMs(d)
+    if (Number.isNaN(diff)) return ''
     if (diff < 60000) return t('post.justNow')
     if (diff < 3600000) return t('post.minutesShort', { n: String(Math.floor(diff/60000)) })
     if (diff < 86400000) return t('post.hoursShort', { n: String(Math.floor(diff/3600000)) })

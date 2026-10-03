@@ -7,6 +7,7 @@ import { notifApi } from '../utils/api'
 import Avatar from '../components/ui/Avatar'
 import { useT } from '../i18n/useT'
 import { AtSign, Bell, Handshake, Heart, KeyRound, Megaphone, MessageCircle, Reply, Tag, UserCheck, UserPlus, type LucideIcon } from 'lucide-react'
+import { apiAgeMs } from '../utils/time'
 
 // SP-5-15: one coherent (Lucide) icon per notification type — each type
 // distinct, so a friend request and its acceptance never look alike.
@@ -110,8 +111,9 @@ export default function Buzz() {
   )
 }
 
-function timeAgo(d: string, t: ReturnType<typeof useT>): string {
-  const diff = Date.now() - new Date(d).getTime()
+export function timeAgo(d: string, t: ReturnType<typeof useT>, now: number = Date.now()): string {
+  const diff = apiAgeMs(d, now)
+  if (Number.isNaN(diff)) return ''
   if (diff < 60000) return t('buzz.justNow')
   if (diff < 3600000) return t('buzz.minutesAgo', { n: String(Math.floor(diff/60000)) })
   if (diff < 86400000) return t('buzz.hoursAgo', { n: String(Math.floor(diff/3600000)) })

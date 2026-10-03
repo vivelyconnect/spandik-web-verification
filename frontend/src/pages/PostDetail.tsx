@@ -16,6 +16,7 @@ import LinkPreviewCard from '../components/post/LinkPreviewCard'
 import { useLinkPreview } from '../hooks/useLinkPreview'
 import toast from 'react-hot-toast'
 import { useT } from '../i18n/useT'
+import { apiAgeMs } from '../utils/time'
 
 const REACTIONS = [
   { type: 'like', emoji: '👍' }, { type: 'love', emoji: '❤️' },
@@ -31,7 +32,8 @@ const MAX_INDENT_DEPTH = 4
 const INDENT_PX = 24
 
 function timeAgo(d: string, t: ReturnType<typeof useT>) {
-  const diff = Date.now() - new Date(d).getTime()
+  const diff = apiAgeMs(d)
+  if (Number.isNaN(diff)) return ''
   if (diff < 60000) return t('post.justNow')
   if (diff < 3600000) return t('post.minutesShort', { n: String(Math.floor(diff / 60000)) })
   if (diff < 86400000) return t('post.hoursShort', { n: String(Math.floor(diff / 3600000)) })
