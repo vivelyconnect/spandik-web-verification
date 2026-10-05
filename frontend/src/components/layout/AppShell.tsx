@@ -32,6 +32,7 @@ import type { StringKey } from '../../i18n/strings'
 import { tabIndicatorTransition, PRESS_TAP } from '../../motion/presets'
 import { hapticTap } from '../../motion/haptics'
 import { useCelebrationStore } from '../../stores/celebrationStore'
+import { installKeyboardDetector } from '../../utils/keyboardViewport'
 
 const DESKTOP_NAV: { to: string; key: StringKey }[] = [
   { to: '/',        key: 'nav.home'       },
@@ -120,6 +121,9 @@ export default function AppShell() {
     refetchOnWindowFocus: true,
     staleTime: 15000,
   })
+  // Software-keyboard detection for the whole shell (html.kb-open).
+  useEffect(() => installKeyboardDetector(), [])
+
   const totalUnreadChat = (threadsData?.data as any[])?.reduce((sum: number, t: any) => sum + (t.unread_count || 0), 0) || 0
   const totalUnreadNotif = (notifData?.data?.unread_count as number) || 0
 

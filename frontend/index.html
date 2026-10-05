@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <meta name="theme-color" content="#FF9F1C" />
   <meta name="description" content="Spandik — India's own social media, a product of Vively Technology Solutions Private Limited. Connect, share and chat in English, Hindi and Bengali." />
   <title>Spandik</title>
@@ -55,6 +55,10 @@
       .main-content { padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important; }
       .desktop-footer { display: none !important; }
     }
+    /* Software keyboard open (utils/keyboardViewport.ts): the bottom nav sits
+       behind/above the keyboard and is unusable — don't show or reserve it. */
+    html.kb-open .mobile-bottom-nav { display: none !important; }
+    html.kb-open .main-content { padding-bottom: 0 !important; }
 
     /* ── Glass card utility ── */
     .glass-card {

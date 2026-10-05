@@ -17,6 +17,7 @@ import ReportModal from '../components/ui/ReportModal'
 import toast from 'react-hot-toast'
 import { useT } from '../i18n/useT'
 import { parseApiTime } from '../utils/time'
+import { shapeOf, classifyChange, isNearBottom, prependAnchorTop, followsAppend } from '../utils/chatScroll'
 
 // SP-14-03: only loaded when someone opens it (carries the QR encoder)
 const SafetyNumberModal = lazy(() => import('../components/chat/SafetyNumberModal'))
@@ -31,7 +32,7 @@ export default function ChatRoom() {
   // the auto-popup) so this banner disappears without needing a remount.
   usePinModalStore(s => s.keysVersion)
   const listRef = useRef<HTMLDivElement>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const inputRef       = useRef<HTMLTextAreaElement>(null)
   const fileInputRef   = useRef<HTMLInputElement>(null)
   const typingTimer    = useRef<ReturnType<typeof setTimeout>>()
@@ -75,30 +76,77 @@ export default function ChatRoom() {
 
   const other = thread?.other_user
 
-  // Auto-scroll to bottom on new messages — the LIST only. scrollIntoView
-  // also scrolled every ancestor, i.e. the whole page (UAT, 390px).
-  useEffect(() => {
+  // ── Message-list scroll state (UAT: opened mid-history; load-older jumped
+  // to the bottom; new messages yanked readers out of history). Rules live in
+  // utils/chatScroll.ts. Only the LIST scrolls — never the page.
+  const pinnedRef = useRef(true)                     // reader is at the newest message
+  const shapeRef = useRef(shapeOf([], undefined))
+  const anchorRef = useRef<{ height: number; top: number } | null>(null)
+  const toBottom = () => { const l = listRef.current; if (l) l.scrollTop = l.scrollHeight }
+  useLayoutEffect(() => {
     const list = listRef.current
-    if (list) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' })
-  }, [messages])
+    const next = shapeOf(messages, user?.id)
+    const kind = classifyChange(shapeRef.current, next)
+    if (kind === 'initial') { pinnedRef.current = true; toBottom() }       // instant, before paint
+    else if (kind === 'prepend' && list && anchorRef.current) list.scrollTop = prependAnchorTop(anchorRef.current.height, anchorRef.current.top, list.scrollHeight)
+    else if (kind === 'append' && followsAppend(pinnedRef.current, next.lastMine)) { pinnedRef.current = true; toBottom() }
+    anchorRef.current = null
+    shapeRef.current = next
+  }, [messages, user?.id])
+  // Images decoding, the typing indicator, tombstones, a growing composer or
+  // the keyboard all change heights after render: while pinned, stay pinned.
+  useEffect(() => {
+    const list = listRef.current, content = contentRef.current
+    if (!list || !content || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => { if (pinnedRef.current) toBottom() })
+    ro.observe(list); ro.observe(content)
+    return () => ro.disconnect()
+  }, [])
+  function onListScroll() {
+    const l = listRef.current
+    if (l) pinnedRef.current = isNearBottom(l.scrollHeight, l.scrollTop, l.clientHeight)
+  }
+  function loadOlder() {
+    const l = listRef.current
+    if (l) anchorRef.current = { height: l.scrollHeight, top: l.scrollTop }
+    loadMore()
+  }
 
-  // Fill exactly the space between the shell's top bar and its mobile bottom
-  // nav (UAT: a 100dvh room under the 39px bar plus the nav's 72px padding
-  // overflowed by 111px, so the page scrolled and hid this header). Tracks
-  // visualViewport so an open keyboard keeps the composer visible.
+  // ── Room height: exactly the visible area between the shell's top bar and
+  // its bottom nav — or the keyboard, when one is open (the nav is hidden
+  // then: html.kb-open, utils/keyboardViewport.ts). Re-measured whenever
+  // anything can move it: visual viewport resize/scroll (keyboard, URL bar,
+  // rotation), the shell above settling (UAT: sized once at mount, the room
+  // later sat 7–33px above the nav), and the keyboard state toggling.
   const rootRef = useRef<HTMLDivElement>(null)
   const [roomHeight, setRoomHeight] = useState<number | null>(null)
   useLayoutEffect(() => {
+    let raf = 0
     const fit = () => {
       const el = rootRef.current; if (!el) return
-      const top = el.getBoundingClientRect().top + window.scrollY
+      const vv = window.visualViewport
+      // iOS pans the page to the focused field instead of resizing; undo it so
+      // the room header stays on screen (Android: resizes-content, no pan).
+      if (vv && vv.offsetTop > 0 && document.documentElement.classList.contains('kb-open')) window.scrollTo(0, 0)
+      const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight   // viewport coords
       const nav = document.querySelector<HTMLElement>('.mobile-bottom-nav')
-      const bottom = nav && getComputedStyle(nav).display !== 'none' ? nav.offsetHeight : 0
-      setRoomHeight(Math.max(240, Math.floor((window.visualViewport?.height ?? window.innerHeight) - top - bottom)))
+      const navReserve = nav && getComputedStyle(nav).display !== 'none' ? nav.getBoundingClientRect().height : 0
+      const h = Math.max(200, Math.floor(visibleBottom - el.getBoundingClientRect().top - navReserve))
+      setRoomHeight(prev => prev === h ? prev : h)
     }
+    const schedule = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fit) }   // after kb-open has toggled
     fit()
-    window.addEventListener('resize', fit); window.visualViewport?.addEventListener('resize', fit)
-    return () => { window.removeEventListener('resize', fit); window.visualViewport?.removeEventListener('resize', fit) }
+    const vv = window.visualViewport
+    const shell = rootRef.current?.parentElement
+    const ro = typeof ResizeObserver !== 'undefined' && shell ? new ResizeObserver(schedule) : null
+    if (ro && shell) ro.observe(shell)
+    window.addEventListener('resize', schedule); window.addEventListener('spandik:viewport', schedule)
+    vv?.addEventListener('resize', schedule); vv?.addEventListener('scroll', schedule)
+    return () => {
+      cancelAnimationFrame(raf); ro?.disconnect()
+      window.removeEventListener('resize', schedule); window.removeEventListener('spandik:viewport', schedule)
+      vv?.removeEventListener('resize', schedule); vv?.removeEventListener('scroll', schedule)
+    }
   }, [])
 
   // Mark every currently-unread message in this thread as seen in one
@@ -299,10 +347,11 @@ export default function ChatRoom() {
       )}
 
       {/* Messages area */}
-      <div ref={listRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div ref={listRef} onScroll={onListScroll} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+      <div ref={contentRef} style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {/* Load more */}
         {hasMore && (
-          <button onClick={loadMore}
+          <button onClick={loadOlder}
             style={{ alignSelf: 'center', padding: '6px 14px', borderRadius: 99, background: 'var(--bg2)', border: '1px solid var(--border)', cursor: 'pointer', fontSize: 12, color: 'var(--text4)', marginBottom: 8 }}>
             {t('chat.loadOlderMessages')}
           </button>
@@ -372,7 +421,7 @@ export default function ChatRoom() {
           )}
         </AnimatePresence>
 
-        <div ref={messagesEndRef} />
+      </div>
       </div>
 
       {/* Input area */}
