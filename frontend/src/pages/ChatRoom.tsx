@@ -82,7 +82,31 @@ export default function ChatRoom() {
   const pinnedRef = useRef(true)                     // reader is at the newest message
   const shapeRef = useRef(shapeOf([], undefined))
   const anchorRef = useRef<{ height: number; top: number } | null>(null)
-  const toBottom = () => { const l = listRef.current; if (l) l.scrollTop = l.scrollHeight }
+  // Thread ENTRY is its own phase (UAT: re-opening a thread sometimes settled
+  // 347px up). While 'settling', only a real user gesture may unpin — a
+  // layout/programmatic scroll event never does — and the view is held at the
+  // newest message until the first history is rendered and every image in it
+  // has decoded. Then 'live': normal reading rules.
+  const entryRef = useRef<'settling' | 'live'>('settling')
+  // The scroll event of a programmatic scroll is dispatched a frame later and
+  // reads geometry THEN — an image that took its size in between made it look
+  // like the reader had scrolled away (the UAT re-entry bug). The app's own
+  // scrolls are therefore never read as the reader moving.
+  const selfScrollRef = useRef(false)
+  const toBottom = () => { const l = listRef.current; if (l && l.scrollTop !== l.scrollHeight - l.clientHeight) { selfScrollRef.current = true; l.scrollTop = l.scrollHeight } }
+  const threadKey = resolvedId || id
+  useLayoutEffect(() => {
+    // Every new entry (mount, or switching thread in place) starts at the newest
+    // message — never a previous visit's position.
+    entryRef.current = 'settling'; pinnedRef.current = true
+    shapeRef.current = shapeOf([], undefined); anchorRef.current = null
+  }, [threadKey])
+  const settleIfReady = () => {
+    const content = contentRef.current
+    if (entryRef.current !== 'settling' || !content || shapeRef.current.count === 0) return
+    if ([...content.querySelectorAll('img')].some(i => !i.complete)) return   // a decode will fire 'load'
+    toBottom(); entryRef.current = 'live'
+  }
   useLayoutEffect(() => {
     const list = listRef.current
     const next = shapeOf(messages, user?.id)
@@ -92,6 +116,7 @@ export default function ChatRoom() {
     else if (kind === 'append' && followsAppend(pinnedRef.current, next.lastMine)) { pinnedRef.current = true; toBottom() }
     anchorRef.current = null
     shapeRef.current = next
+    if (kind === 'initial') requestAnimationFrame(settleIfReady)   // after this commit's layout
   }, [messages, user?.id])
   // Images decoding, the typing indicator, tombstones, a growing composer or
   // the keyboard all change heights after render: while pinned, stay pinned.
@@ -100,11 +125,30 @@ export default function ChatRoom() {
     if (!list || !content || typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver(() => { if (pinnedRef.current) toBottom() })
     ro.observe(list); ro.observe(content)
-    return () => ro.disconnect()
+    // Entry settles once the rendered images have decoded ('load'/'error' don't
+    // bubble — listen in the capture phase on the content).
+    const onMedia = () => { if (pinnedRef.current) toBottom(); settleIfReady() }
+    content.addEventListener('load', onMedia, true); content.addEventListener('error', onMedia, true)
+    // A real gesture hands control to the reader even mid-settle.
+    const onGesture = () => { entryRef.current = 'live' }
+    const gestures = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
+    for (const g of gestures) list.addEventListener(g, onGesture, { passive: true })
+    return () => {
+      ro.disconnect()
+      content.removeEventListener('load', onMedia, true); content.removeEventListener('error', onMedia, true)
+      for (const g of gestures) list.removeEventListener(g, onGesture)
+    }
   }, [])
   function onListScroll() {
     const l = listRef.current
-    if (l) pinnedRef.current = isNearBottom(l.scrollHeight, l.scrollTop, l.clientHeight)
+    if (!l) return
+    if (selfScrollRef.current) {               // our own pin: stay pinned, catch up with any growth
+      selfScrollRef.current = false
+      if (pinnedRef.current && !isNearBottom(l.scrollHeight, l.scrollTop, l.clientHeight)) toBottom()
+      return
+    }
+    if (entryRef.current === 'settling') return   // layout scroll during entry: not the reader
+    pinnedRef.current = isNearBottom(l.scrollHeight, l.scrollTop, l.clientHeight)
   }
   function loadOlder() {
     const l = listRef.current
@@ -347,7 +391,7 @@ export default function ChatRoom() {
       )}
 
       {/* Messages area */}
-      <div ref={listRef} onScroll={onListScroll} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+      <div ref={listRef} onScroll={onListScroll} data-testid="chat-message-list" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', overflowAnchor: 'none' }}>
       <div ref={contentRef} style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {/* Load more */}
         {hasMore && (
