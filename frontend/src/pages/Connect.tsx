@@ -1,4 +1,5 @@
 // src/pages/Connect.tsx — LiveConnect video call UI
+import { type CallState, showsPreConnectOverlay, connectedSeconds, formatDuration } from '../utils/callLifecycle'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { m as motion, AnimatePresence } from 'framer-motion'
@@ -35,7 +36,6 @@ async function fetchIceServers(targetUserId?: string | null): Promise<RTCIceServ
 // window (both signaling-room-empty and server-side ringing), and the
 // caller's outcome text is driven by the server's own call_resolved event
 // (see `outcome` state below), never guessed from peer/socket state alone.
-type CallState = 'idle' | 'calling' | 'ringing' | 'connected' | 'ended' | 'failed'
 type CallOutcome = 'declined' | 'no_answer' | 'cancelled' | 'failed' | null
 
 export default function Connect() {
@@ -84,7 +84,10 @@ export default function Connect() {
   const [muted, setMuted]         = useState(false)
   const [videoOff, setVideoOff]   = useState(false)
   const [screenSharing, setScreenSharing] = useState(false)
-  const [callDuration, setCallDuration]   = useState(0)
+  // Real connected time (UAT): stamped on the first connect, frozen at hang-up.
+  const [connectedAt, setConnectedAt]     = useState<number | null>(null)
+  const [endedAt, setEndedAt]             = useState<number | null>(null)
+  const [, setTick]                       = useState(0)
   const durationRef = useRef<ReturnType<typeof setInterval>>()
 
   // Auto-start: either place an outgoing targeted call (?user=, from
@@ -125,16 +128,18 @@ export default function Connect() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedEvent])
 
-  // Call duration timer
+  // Call duration: stamp the first connect, re-render once a second while live.
   useEffect(() => {
     if (callState === 'connected') {
-      durationRef.current = setInterval(() => setCallDuration(d => d + 1), 1000)
+      setConnectedAt(at => at ?? Date.now())
+      durationRef.current = setInterval(() => setTick(n => n + 1), 1000)
     } else {
       clearInterval(durationRef.current)
-      if (callState === 'ended') setCallDuration(0)
+      if (callState === 'idle') { setConnectedAt(null); setEndedAt(null) }
     }
     return () => clearInterval(durationRef.current)
   }, [callState])
+  const callDuration = connectedSeconds(connectedAt, endedAt, Date.now())
 
   // ── SP-3-05: start a targeted 1:1 call (server-authoritative) ──
   async function startTargetedCall() {
@@ -324,6 +329,7 @@ export default function Connect() {
     wsRef.current?.close()
     pcRef.current?.close()
     localStreamRef.current?.getTracks().forEach(t => t.stop())
+    setEndedAt(at => at ?? Date.now())
     setCallState('ended')
     setScreenSharing(false)
   }
@@ -368,11 +374,6 @@ export default function Connect() {
     }
   }
 
-  function formatDuration(s: number): string {
-    const m = Math.floor(s / 60)
-    const sec = s % 60
-    return `${m}:${sec.toString().padStart(2, '0')}`
-  }
 
   function failedStateText(): string {
     switch (outcome) {
@@ -414,7 +415,7 @@ export default function Connect() {
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: callState === 'connected' ? 'block' : 'none' }} />
 
         {/* Calling/connecting overlay */}
-        {callState !== 'connected' && (
+        {showsPreConnectOverlay(callState) && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
             <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 1.5, repeat: Infinity }}
               style={{ width: 80, height: 80, borderRadius: '50%', background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>
@@ -443,7 +444,7 @@ export default function Connect() {
         {/* Duration */}
         {callState === 'connected' && (
           <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.5)', color: '#fff', padding: '4px 12px', borderRadius: 99, fontSize: 13, fontWeight: 600 }}>
-            {formatDuration(callDuration)}
+            {formatDuration(callDuration ?? 0)}
           </div>
         )}
 
@@ -478,7 +479,7 @@ export default function Connect() {
             style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
             <PhoneOff size={48} strokeWidth={1.5} aria-hidden color="rgba(255,255,255,0.8)" />
             <div style={{ color: '#fff', fontSize: 22, fontWeight: 700 }}>{t('call.callEndedHeading')}</div>
-            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 16 }}>{formatDuration(callDuration)}</div>
+            {callDuration !== null && <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 16 }}>{formatDuration(callDuration)}</div>}
             <button onClick={() => navigate(-1)}
               style={{ marginTop: 8, padding: '12px 28px', borderRadius: 99, background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: 15, fontWeight: 600 }}>
               {t('overlay.close')}

@@ -255,12 +255,11 @@ function ThreadRow({ thread, currentUserId, onClick }: { thread: any; currentUse
   const preview = () => {
     if (!lastMsg) return isPending ? t('chat.pendingRequestEllipsis') : t('chat.startConversationNoArrow')
     if (lastMsg.is_deleted) return t('chat.messageDeleted')
-    if (lastMsg.type === 'image') return t('chat.photoLabel')
-    if (lastMsg.type === 'audio') return t('chat.voiceMessageLabel')
-    const isMe = lastMsg.sender_id === currentUserId
-    // SP-0-02: never fall back to rendering content_encrypted — it's ciphertext, not text.
-    const text  = lastMsg.content_plain || t('chat.encryptedLabel')
-    return isMe ? t('chat.youPrefix', { text }) : text
+    // Content-independent by design (UAT: rows read "Encrypted"): the list is
+    // never decrypted, so a preview names only the KIND of the last message.
+    // SP-0-02 still holds — content_encrypted is never rendered.
+    const text = lastMsg.type === 'image' ? t('chat.photoLabel') : lastMsg.type === 'audio' ? t('chat.voiceMessageLabel') : t('chat.previewMessage')
+    return lastMsg.sender_id === currentUserId ? t('chat.youPrefix', { text }) : text
   }
 
   return (

@@ -1,5 +1,5 @@
 // src/pages/ChatRoom.tsx
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -30,6 +30,7 @@ export default function ChatRoom() {
   // Re-render live the moment keys are restored (here, in Settings, or via
   // the auto-popup) so this banner disappears without needing a remount.
   usePinModalStore(s => s.keysVersion)
+  const listRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef       = useRef<HTMLTextAreaElement>(null)
   const fileInputRef   = useRef<HTMLInputElement>(null)
@@ -57,7 +58,7 @@ export default function ChatRoom() {
     }
   }, [targetUsername, id])
 
-  const { messages, typing, connected, sendMessage, sendImage, sendTyping, markThreadSeen, loadMore, hasMore, loading, recipientHasKey, requestStatus, isSender, retryMessage, keyChangeWarning, acceptKeyChange, deleteMessage } = useChat(resolvedId || id)
+  const { messages, typing, reconnecting, sendMessage, sendImage, sendTyping, markThreadSeen, loadMore, hasMore, loading, recipientHasKey, requestStatus, isSender, retryMessage, keyChangeWarning, acceptKeyChange, deleteMessage } = useChat(resolvedId || id)
 
   // Thread metadata (other user info). SP-3-01: was a one-shot fetch, so
   // the online dot only ever updated on navigation/remount — a bounded
@@ -74,10 +75,31 @@ export default function ChatRoom() {
 
   const other = thread?.other_user
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages — the LIST only. scrollIntoView
+  // also scrolled every ancestor, i.e. the whole page (UAT, 390px).
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const list = listRef.current
+    if (list) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' })
   }, [messages])
+
+  // Fill exactly the space between the shell's top bar and its mobile bottom
+  // nav (UAT: a 100dvh room under the 39px bar plus the nav's 72px padding
+  // overflowed by 111px, so the page scrolled and hid this header). Tracks
+  // visualViewport so an open keyboard keeps the composer visible.
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [roomHeight, setRoomHeight] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const fit = () => {
+      const el = rootRef.current; if (!el) return
+      const top = el.getBoundingClientRect().top + window.scrollY
+      const nav = document.querySelector<HTMLElement>('.mobile-bottom-nav')
+      const bottom = nav && getComputedStyle(nav).display !== 'none' ? nav.offsetHeight : 0
+      setRoomHeight(Math.max(240, Math.floor((window.visualViewport?.height ?? window.innerHeight) - top - bottom)))
+    }
+    fit()
+    window.addEventListener('resize', fit); window.visualViewport?.addEventListener('resize', fit)
+    return () => { window.removeEventListener('resize', fit); window.visualViewport?.removeEventListener('resize', fit) }
+  }, [])
 
   // Mark every currently-unread message in this thread as seen in one
   // batch operation (SP-3-04) — see useChat.ts's markThreadSeen for the
@@ -137,7 +159,7 @@ export default function ChatRoom() {
 
   const isTyping = typing.length > 0
   // Sender can always send even when pending; recipient must accept first
-  const canSend = (isSender || requestStatus !== 'pending') && recipientHasKey !== false
+  const canSend = requestStatus !== 'declined' && (isSender || requestStatus !== 'pending') && recipientHasKey !== false
   // SP-15-17: text only until the recipient accepts — matches the real
   // server-side gate in chat.ts's POST /threads/:id/messages (which is the
   // actual enforcement point; this only keeps the UI from offering an action
@@ -151,7 +173,7 @@ export default function ChatRoom() {
   const verified = !!(user?.id && other?.id && isVerified(user.id, other.id, contactKey))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100dvh', maxWidth: 680, margin: '0 auto' }}>
+    <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', height: roomHeight ?? '100dvh', maxWidth: 680, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--white)', borderBottom: '1px solid var(--border)', flexShrink: 0, boxShadow: 'var(--shadow-sm)' }}>
         <button onClick={() => navigate('/chats')}
@@ -227,6 +249,21 @@ export default function ChatRoom() {
             {t('chat.trustThisKey')}
           </button>
         </div>
+      ) : requestStatus === 'declined' ? (
+        // UAT P2: a declined request is closed (the server refuses sends and
+        // the live channel). Only the recipient can deliberately reopen it.
+        <div style={{ background: 'var(--bg2)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <Ban size={14} aria-hidden />
+          <span style={{ fontSize: 11.5, color: 'var(--text3)', fontWeight: 600, flex: 1 }}>
+            {isSender ? t('chat.requestClosedSender') : t('chat.requestDeclinedByYou')}
+          </span>
+          {!isSender && (
+            <button onClick={handleAccept} disabled={accepting}
+              style={{ minHeight: 44, padding: '4px 14px', borderRadius: 8, background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+              {accepting ? '...' : t('chat.reopenChat')}
+            </button>
+          )}
+        </div>
       ) : requestStatus === 'pending' && !isSender ? (
         // Recipient sees Accept button
         <div style={{ background: 'var(--warning-bg)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -262,7 +299,7 @@ export default function ChatRoom() {
       )}
 
       {/* Messages area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div ref={listRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {/* Load more */}
         {hasMore && (
           <button onClick={loadMore}
@@ -380,7 +417,7 @@ export default function ChatRoom() {
         </div>
 
         {/* Connection status */}
-        {!connected && (
+        {reconnecting && (
           <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text4)', marginTop: 4 }}>
             {t('chat.reconnectingEllipsis')}
           </div>
@@ -495,9 +532,11 @@ function MessageBubble({ msg, isMe, showAvatar, senderPic, senderName, allSeen, 
               {msg.content_plain && (
                 <div style={{ fontSize: 14, lineHeight: 1.5, wordBreak: 'break-word' }}>{msg.content_plain}</div>
               )}
-              {msg.content_encrypted && !msg.content_plain && (
+              {/* A decrypted photo is just a photo (UAT: it also said "Encrypted
+                  message"); the lock label is only for something that failed. */}
+              {msg.content_encrypted && !msg.content_plain && !(msg.type === 'image' && msg.media_plain_url) && (
                 <div style={{ fontSize: 13, opacity: 0.7, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Lock size={13} aria-hidden /> {t('chat.encryptedMessageLabel')}
+                  <Lock size={13} aria-hidden /> {msg.type === 'image' ? t('chat.photoCouldNotDecrypt') : t('chat.encryptedMessageLabel')}
                 </div>
               )}
             </>

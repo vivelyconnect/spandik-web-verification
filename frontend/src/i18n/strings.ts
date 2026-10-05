@@ -796,7 +796,6 @@ const en = {
   'chat.cannotStartChat': 'Cannot start chat with this user',
   'chat.declineRequestFailed': 'Failed to decline request',
   'chat.e2eEncryptedNotice': 'End-to-end encrypted. Spandik does not store your unencrypted chat key.',
-  'chat.encryptedLabel': 'Encrypted',
   'chat.encryptedMessageLabel': 'Encrypted message',
   'chat.enterPinButton': 'Enter PIN',
   'chat.enterPinToUnlockThisChat': 'Enter your Chat PIN to unlock messages in this chat',
@@ -810,6 +809,11 @@ const en = {
   'chat.noUsersFoundFor': 'No users found for "{query}"',
   'chat.pendingBadge': 'pending',
   'chat.pendingRequestEllipsis': 'Pending request...',
+  'chat.requestClosedSender': 'You can\'t send messages in this conversation.',
+  'chat.requestDeclinedByYou': 'You declined this message request.',
+  'chat.reopenChat': 'Reopen chat',
+  'chat.previewMessage': 'Message',
+  'chat.photoCouldNotDecrypt': 'This photo couldn\'t be decrypted',
   'chat.photoLabel': 'Photo',
   'chat.preview': 'Preview',
   'chat.reconnectingEllipsis': 'Reconnecting...',
@@ -994,7 +998,9 @@ export const isLangLoaded = (lang: Lang) => !!strings[lang]
 // Missing (not yet loaded) dictionaries fall back to English per key.
 export function translate(lang: Lang, key: StringKey, vars?: Record<string, string>): string {
   let out = strings[lang]?.[key] ?? strings.en[key]
-  if (vars) for (const [k, v] of Object.entries(vars)) out = out.replace(`{${k}}`, v)
+  // Every occurrence (UAT: the safety-number text showed a literal second
+  // "{name}"); split/join inserts the value verbatim (no "$&" patterns).
+  if (vars) for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(v)
   return out
 }
 

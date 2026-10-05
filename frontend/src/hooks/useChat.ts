@@ -238,6 +238,15 @@ function decryptMessage(
   } catch { return null }
 }
 
+// Ticket mint failed: null = permanent refusal for this thread (403 declined
+// request, 404 not a member / blocked) — never retry, it only spams ticket
+// requests; otherwise the same capped backoff a dropped socket uses (each
+// retry mints a fresh single-use ticket — a ticket is never reused).
+export function chatTicketRetryDelay(status: number | undefined, attempt: number): number | null {
+  if (status === 403 || status === 404) return null
+  return Math.min(1000 * Math.pow(2, attempt), 30000)
+}
+
 function encryptBytes(bytes: Uint8Array, key: Uint8Array): { encrypted: Uint8Array; nonce: string } | null {
   try {
     const nonce = nacl.randomBytes(nacl.secretbox.nonceLength)
@@ -291,6 +300,9 @@ export function useChat(threadId: string | undefined) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [typing, setTyping]     = useState<TypingUser[]>([])
   const [connected, setConnected] = useState(false)
+  // Whether this room's socket has opened at least once — the room says
+  // "Reconnecting…" only for a real drop, not during the first connect (UAT).
+  const everConnected = useRef(false)
   const [loading, setLoading]   = useState(true)
   const [hasMore, setHasMore]   = useState(false)
   const [recipientHasKey, setRecipientHasKey] = useState<boolean | null>(null)
@@ -510,23 +522,31 @@ export function useChat(threadId: string | undefined) {
     // single connect and reconnect. `connect` runs on both the initial
     // mount and every reconnect (via ws.onclose below), so this one
     // change covers both per SP-2-11's acceptance criterion.
+    // UAT: closing the socket in cleanup fires onclose AFTER the timer was
+    // cleared, so a stale effect kept reconnecting (and minting tickets) next
+    // to the new one. Once disposed, this effect never reconnects again.
+    let disposed = false
+    everConnected.current = false // a new room / token-refresh reconnect is not a "drop"
     async function connect() {
+      if (disposed) return
       let ticket: string
       try {
         const res = await api.post<ApiEnvelope<{ ticket: string }>>(`/chat/threads/${threadId}/ws-ticket`)
         if (!res.data.ok || !res.data.data?.ticket) throw new Error('no ticket')
         ticket = res.data.data.ticket
-      } catch {
-        // Couldn't mint a ticket (network blip, thread not found, etc.) —
-        // retry with the same backoff a dropped WS would use.
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000)
+      } catch (err: any) {
+        if (disposed) return
+        const delay = chatTicketRetryDelay(err?.response?.status, reconnectAttempts.current)
+        if (delay === null) return
         reconnectAttempts.current++
         reconnectRef.current = setTimeout(connect, delay)
         return
       }
+      if (disposed) return
       const ws = new WebSocket(`${CHAT_WS_URL}/chat/thread/${threadId}?ticket=${ticket}`)
       wsRef.current = ws
       ws.onopen = () => {
+        everConnected.current = true
         // SP-2-01: a single catch-up fetch for whatever landed while
         // disconnected replaces the old poll's job of covering that gap.
         setConnected(true)
@@ -578,6 +598,7 @@ export function useChat(threadId: string | undefined) {
       ws.onclose = () => {
         setConnected(false)
         clearInterval(pingRef.current)
+        if (disposed) return
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000)
         reconnectAttempts.current++
         reconnectRef.current = setTimeout(connect, delay)
@@ -586,6 +607,7 @@ export function useChat(threadId: string | undefined) {
     }
     connect()
     return () => {
+      disposed = true
       wsRef.current?.close()
       clearInterval(pingRef.current)
       clearTimeout(reconnectRef.current)
@@ -889,5 +911,5 @@ export function useChat(threadId: string | undefined) {
     sendMessage(msg.content_plain, 'text')
   }, [messages, sendMessage])
 
-  return { messages, typing, connected, sendMessage, sendImage, sendTyping, markThreadSeen, loadMore, hasMore, loading, recipientHasKey, requestStatus, isSender, retryMessage, keyChangeWarning, acceptKeyChange, deleteMessage }
+  return { messages, typing, connected, reconnecting: !connected && everConnected.current, sendMessage, sendImage, sendTyping, markThreadSeen, loadMore, hasMore, loading, recipientHasKey, requestStatus, isSender, retryMessage, keyChangeWarning, acceptKeyChange, deleteMessage }
 }
