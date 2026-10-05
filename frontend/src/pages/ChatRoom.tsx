@@ -398,7 +398,7 @@ export default function ChatRoom() {
               value={input}
               onChange={handleInput}
               onKeyDown={handleKeyDown}
-              placeholder={!canSend ? t('chat.cannotSendPlaceholder') : t('chat.messagePlaceholder')}
+              placeholder={requestStatus === 'declined' ? (isSender ? t('chat.requestClosedSender') : t('chat.requestDeclinedByYou')) : !canSend ? t('chat.cannotSendPlaceholder') : t('chat.messagePlaceholder')}
               rows={1}
               disabled={!canSend}
               style={{ flex: 1, background: 'none', border: 'none', outline: 'none', resize: 'none', fontSize: 14, color: 'var(--text)', fontFamily: 'inherit', lineHeight: 1.5, maxHeight: 120, overflow: 'auto' }}
