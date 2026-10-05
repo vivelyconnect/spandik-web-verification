@@ -1,0 +1,3 @@
+Rekor log index: 3083621105
+https://search.sigstore.dev/?logIndex=3083621105
+root: 4e46936945e2c186b42258f5b02736107d283fac06690a17297a0c57162e5465
