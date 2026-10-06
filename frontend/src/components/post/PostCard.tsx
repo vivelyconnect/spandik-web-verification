@@ -1,5 +1,6 @@
 // src/components/post/PostCard.tsx — Enterprise PostCard with Phase 4 features
-import { lazy, Suspense, useState, useRef } from 'react'
+import { lazy, Suspense, useState, useRef, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { m as motion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import { postApi } from '../../utils/api'
@@ -18,8 +19,11 @@ import { buildDelivery } from '../../utils/mediaDelivery'
 import { PRESS_TAP, burstPieces, burstTransition } from '../../motion/presets'
 import { hapticTap } from '../../motion/haptics'
 import Overlay from '../ui/Overlay'
-import { Bookmark, Ellipsis, Flag, Link as LinkIcon, MapPin, MessageCircle, Pencil, Share2, ThumbsUp, Trash2 } from 'lucide-react'
+import { Bookmark, Ellipsis, Eye, Flag, Globe, Link as LinkIcon, Lock, MapPin, MessageCircle, Pencil, Share2, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
 import { apiAgeMs } from '../../utils/time'
+import { POST_VISIBILITIES, VISIBILITY_LABEL_KEY, VISIBILITY_DESC_KEY, normalizeVisibility, visibilityNoteKey, type PostVisibility } from '../../utils/postVisibility'
+import { syncPostVisibilityCaches } from '../../utils/postCache'
+import { dropFromLastFeed } from '../../utils/feedCache'
 
 const REACTIONS = [
   { type: 'like', emoji: '👍' }, { type: 'love', emoji: '❤️' },
@@ -57,6 +61,25 @@ export default function PostCard({ post, onUpdate, onDelete }: { post: any; onUp
   // undefined defaults enabled, matching the API's own backward-compat rule.
   const [commentsEnabled, setCommentsEnabled] = useState(post.comments_enabled !== false)
   const [sharingEnabled, setSharingEnabled]   = useState(post.sharing_enabled !== false)
+  // SP-2-17: the owner's "who can see this". `visibility` only ever changes to
+  // what the SERVER answered (never optimistically); `pendingVis` is just the
+  // radio selection inside the chooser until Save.
+  const qc = useQueryClient()
+  const [visibility, setVisibility]     = useState<PostVisibility>(normalizeVisibility(post.visibility))
+  const [showVisibility, setShowVisibility] = useState(false)
+  const [pendingVis, setPendingVis]     = useState<PostVisibility>(visibility)
+  const [visSaving, setVisSaving]       = useState(false)
+  const [visError, setVisError]         = useState(false)
+  useEffect(() => { setVisibility(normalizeVisibility(post.visibility)) }, [post.visibility])
+  const moreBtnRef = useRef<HTMLButtonElement>(null)
+  // Keyboard/SR continuity: the chooser opens ON the current choice, and closing
+  // it returns focus to the "More" button (the menu row that opened it is gone).
+  const wasVisOpen = useRef(false)
+  useEffect(() => {
+    if (showVisibility) requestAnimationFrame(() => document.querySelector<HTMLInputElement>(`input[name="vis-${post.id}"]:checked`)?.focus())
+    else if (wasVisOpen.current) requestAnimationFrame(() => moreBtnRef.current?.focus())
+    wasVisOpen.current = showVisibility
+  }, [showVisibility, post.id])
 
   const longPressTimer    = useRef<ReturnType<typeof setTimeout>>()
   const longPressTriggered = useRef(false)
@@ -143,6 +166,33 @@ export default function PostCard({ post, onUpdate, onDelete }: { post: any; onUp
     }
   }
 
+  function openVisibility() {
+    setPendingVis(visibility); setVisError(false); setShowMenu(false); setShowVisibility(true)
+  }
+
+  // SP-2-17: PATCH /posts/:id { visibility } (SP-0-04R owns the media-store
+  // move + old-public-URL purge). Server-authoritative: on failure nothing
+  // local changes and the chooser stays open with a clear message.
+  async function handleSaveVisibility() {
+    if (visSaving || pendingVis === visibility) return
+    setVisSaving(true); setVisError(false)
+    try {
+      const res = await postApi.updateVisibility(post.id, pendingVis)
+      const data = res.data?.data ?? {}
+      const result = normalizeVisibility(data.visibility)
+      setVisibility(result)
+      if (typeof data.comments_enabled === 'boolean') setCommentsEnabled(data.comments_enabled)
+      if (typeof data.sharing_enabled === 'boolean') setSharingEnabled(data.sharing_enabled)
+      onUpdate?.(post.id, { visibility: result })
+      syncPostVisibilityCaches(qc, post.id, result)
+      if (result !== 'public' && user?.id) dropFromLastFeed(user.id, post.id)
+      setShowVisibility(false)
+      toast.success(t('post.visibilityChanged', { who: t(VISIBILITY_LABEL_KEY[result]) }))
+    } catch {
+      setVisError(true)
+    } finally { setVisSaving(false) }
+  }
+
   // SP-11-07: this menu item bypasses ShareSheet entirely, so it needs its
   // own fresh server authorization immediately before the clipboard write —
   // the `sharingEnabled` check that gates whether this item even appears is
@@ -203,7 +253,7 @@ export default function PostCard({ post, onUpdate, onDelete }: { post: any; onUp
               desktop centered dialog) instead of a hand-rolled absolute
               dropdown + full-screen click-catcher. */}
           <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowMenu(!showMenu)}
+            <button ref={moreBtnRef} data-testid="post-more" onClick={() => setShowMenu(!showMenu)}
               style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: 'var(--text4)', padding: '6px 10px', minWidth: 44, minHeight: 44, justifyContent: 'center' }}>
               <Ellipsis size={18} aria-hidden />{t('post.more')}
             </button>
@@ -212,11 +262,15 @@ export default function PostCard({ post, onUpdate, onDelete }: { post: any; onUp
               {[
                 ...(sharingEnabled ? [{ icon: <LinkIcon size={18} aria-hidden />, label: t('share.copyLink'), action: handleMenuCopyLink }] : []),
                 ...(canEdit ? [{ icon: <Pencil size={18} aria-hidden />, label: t('post.editPost'), action: () => { setEditing(true); setShowMenu(false) } }] : []),
+                ...(isMe ? [{ icon: <Eye size={18} aria-hidden />, label: t('post.changeVisibility'), sub: t('post.visibilityNow', { who: t(VISIBILITY_LABEL_KEY[visibility]) }), action: openVisibility, testId: 'post-change-visibility' }] : []),
                 ...(isMe ? [{ icon: <Trash2 size={18} aria-hidden />, label: t('post.deletePost'), action: handleDelete, danger: true }] : [{ icon: <Flag size={18} aria-hidden />, label: t('post.report'), action: () => { setShowReport(true); setShowMenu(false) } }]),
               ].map((item: any) => (
-                <button key={item.label} onClick={item.action}
+                <button key={item.label} data-testid={item.testId} onClick={item.action}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 14px', minHeight: 44, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 500, color: item.danger ? 'var(--danger)' : 'var(--text)', textAlign: 'left' }}>
-                  <span style={{ display: 'flex', color: item.danger ? 'var(--danger)' : 'var(--text3)' }}>{item.icon}</span>{item.label}
+                  <span style={{ display: 'flex', color: item.danger ? 'var(--danger)' : 'var(--text3)' }}>{item.icon}</span>
+                  {item.sub
+                    ? <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>{item.label}<span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text4)' }}>{item.sub}</span></span>
+                    : item.label}
                 </button>
               ))}
               {/* SP-2-19: owner-only per-post controls — real checkbox/
@@ -234,6 +288,52 @@ export default function PostCard({ post, onUpdate, onDelete }: { post: any; onUp
                 </button>
               ))}
             </Overlay>
+            {/* SP-2-17: the chooser. Native radios (arrow keys, SR "1 of 3",
+                checked state for free); the selection only becomes real on
+                Save, and the note says in plain words who loses/gains access. */}
+            {isMe && (
+              <Overlay open={showVisibility} onClose={() => { if (!visSaving) setShowVisibility(false) }} ariaLabel={t('post.visibilityTitle')} maxWidth={380} testId="visibility-chooser">
+                <fieldset disabled={visSaving} style={{ border: 'none', margin: 0, padding: 0, minInlineSize: 0 }}>
+                  <legend style={{ fontFamily: 'Fraunces, serif', fontWeight: 700, fontSize: 18, color: 'var(--text)', marginBottom: 14, padding: '0 36px 0 0' }}>
+                    {t('post.visibilityTitle')}
+                  </legend>
+                  {POST_VISIBILITIES.map(v => {
+                    const selected = pendingVis === v
+                    const Icon = v === 'public' ? Globe : v === 'friends' ? UsersRound : Lock
+                    return (
+                      <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 56, padding: '10px 14px', marginBottom: 8, borderRadius: 12, cursor: 'pointer',
+                        border: selected ? '1.5px solid var(--link)' : '1px solid var(--border)', background: selected ? 'var(--brand-light)' : 'transparent' }}>
+                        <input type="radio" name={`vis-${post.id}`} value={v} checked={selected} onChange={() => { setPendingVis(v); setVisError(false) }}
+                          style={{ width: 20, height: 20, flexShrink: 0, accentColor: 'var(--link)' }} />
+                        <Icon size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--text3)' }} />
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                            {t(VISIBILITY_LABEL_KEY[v])}
+                            {v === visibility && <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text3)', background: 'var(--bg2)', padding: '1px 8px', borderRadius: 99 }}>{t('post.visibilityCurrentTag')}</span>}
+                          </span>
+                          <span style={{ display: 'block', fontSize: 12.5, color: 'var(--text4)', overflowWrap: 'anywhere' }}>{t(VISIBILITY_DESC_KEY[v])}</span>
+                        </span>
+                      </label>
+                    )
+                  })}
+                </fieldset>
+                <p role="status" aria-live="polite" style={{ minHeight: 20, margin: '4px 2px 12px', fontSize: 13, lineHeight: 1.5, color: 'var(--text2)', overflowWrap: 'anywhere' }}>
+                  {visibilityNoteKey(visibility, pendingVis) ? t(visibilityNoteKey(visibility, pendingVis)!) : ''}
+                </p>
+                {visError && <p role="alert" style={{ margin: '0 2px 12px', fontSize: 13, lineHeight: 1.5, color: 'var(--danger)', overflowWrap: 'anywhere' }}>{t('post.visibilityError')}</p>}
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button type="button" data-testid="visibility-save" onClick={handleSaveVisibility} disabled={visSaving || pendingVis === visibility}
+                    style={{ flex: '1 1 140px', minHeight: 44, padding: '10px 16px', borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 700, cursor: pendingVis === visibility || visSaving ? 'default' : 'pointer',
+                      background: pendingVis === visibility || visSaving ? 'var(--bg2)' : 'var(--btn-primary-bg)', color: pendingVis === visibility || visSaving ? 'var(--text4)' : 'var(--btn-primary-text)' }}>
+                    {visSaving ? t('post.visibilitySaving') : t('post.visibilitySave')}
+                  </button>
+                  <button type="button" onClick={() => setShowVisibility(false)} disabled={visSaving}
+                    style={{ flex: '1 1 120px', minHeight: 44, padding: '10px 16px', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text2)' }}>
+                    {t('post.visibilityCancel')}
+                  </button>
+                </div>
+              </Overlay>
+            )}
           </div>
         </div>
 

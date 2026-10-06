@@ -33,3 +33,11 @@ export function clearAllLastFeeds(storage: Storage = localStorage) {
     keys.forEach(k => storage.removeItem(k))
   } catch {}
 }
+
+// SP-2-17: a post that just stopped being public must not linger in the offline
+// "last feed" read cache (it only ever holds public posts).
+export function dropFromLastFeed(userId: string, postId: string, storage: Storage = localStorage) {
+  const cached = loadLastFeed(userId, storage)
+  if (!cached || !Array.isArray(cached.posts) || !cached.posts.some(p => p?.id === postId)) return
+  try { storage.setItem(PREFIX + userId, JSON.stringify({ ...cached, posts: cached.posts.filter(p => p?.id !== postId) })) } catch {}
+}

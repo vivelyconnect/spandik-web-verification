@@ -245,6 +245,11 @@ export const postApi = {
   // it never touches the 15-minute edit window (see api/src/routes/posts.ts).
   updateControls: (id: string, data: { comments_enabled?: boolean; sharing_enabled?: boolean }) =>
     api.patch(`/posts/${id}`, data),
+  // SP-2-17: owner-only "who can see this" — the same PATCH SP-0-04R built (it
+  // also moves any attached media between the public/private stores). The
+  // response carries the AUTHORITATIVE resulting visibility + controls.
+  updateVisibility: (id: string, visibility: 'public' | 'friends' | 'private') =>
+    api.patch(`/posts/${id}`, { visibility }),
   // SP-11-06: server-side SSRF-safe fetch/parse/cache — see
   // api/src/services/safeOutboundFetch.ts + linkPreview.ts. `signal` lets
   // the composer cancel a stale request when the URL changes mid-typing.
