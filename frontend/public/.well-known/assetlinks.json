@@ -1,0 +1,26 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.vivelytech.spandik",
+      "sha256_cert_fingerprints": [
+        "68:B7:36:01:40:DB:C2:23:8A:F0:EA:7D:52:61:BE:2B:A2:37:E1:F3:57:68:B2:68:B8:FC:CD:43:D4:F9:1B:8A"
+      ]
+    }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.vivelytech.spandik.internal",
+      "sha256_cert_fingerprints": [
+        "44:85:F8:58:2E:D0:5F:14:77:05:DA:E7:21:44:60:D6:C2:C0:A2:9B:21:AB:07:7D:CD:91:31:80:A5:D1:91:00"
+      ]
+    }
+  }
+]

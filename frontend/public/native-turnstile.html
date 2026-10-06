@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Spandik safety check</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; font-family: system-ui, sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; }
+  #msg { color: #453A63; text-align: center; padding: 16px; font-size: 15px; }
+</style>
+</head>
+<body>
+<!-- SP-A-A: the Android app's ONLY browser-rendered surface — a standard Cloudflare Turnstile widget on a
+     Spandik-controlled HTTPS page, shown inside a locked-down WebView. The page hands exactly one short-lived
+     token to the app via ReactNativeWebView.postMessage; the server still verifies it with Cloudflare siteverify. -->
+<div id="widget"></div>
+<p id="msg" hidden></p>
+<script src="/native-turnstile.js"></script>
+</body>
+</html>
